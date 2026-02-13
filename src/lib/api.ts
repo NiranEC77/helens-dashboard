@@ -54,8 +54,8 @@ export async function fetchMovers(): Promise<MoversResponse> {
     return res.json();
 }
 
-export async function fetchChart(ticker: string): Promise<ChartResponse> {
-    const res = await fetch(`${API_BASE}/api/chart/${ticker}`);
+export async function fetchChart(ticker: string, range: string = "1d"): Promise<ChartResponse> {
+    const res = await fetch(`${API_BASE}/api/chart/${ticker}?range=${range}`);
     if (!res.ok) throw new Error(`Failed to fetch chart: ${res.status}`);
     return res.json();
 }

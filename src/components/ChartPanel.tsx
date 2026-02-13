@@ -10,6 +10,7 @@ import {
     ResponsiveContainer,
     CartesianGrid,
     ReferenceLine,
+    Brush,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { fetchChart, fetchNews, formatPrice, type NewsItem } from "@/lib/api";
@@ -37,11 +38,12 @@ interface EnrichedPoint {
 
 export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
     const [hoveredNews, setHoveredNews] = useState<string | null>(null);
+    const [range, setRange] = useState("1d");
 
     // Fetch chart data
     const { data: chartData, isLoading, error } = useQuery({
-        queryKey: ["chart", ticker],
-        queryFn: () => fetchChart(ticker),
+        queryKey: ["chart", ticker, range],
+        queryFn: () => fetchChart(ticker, range),
         refetchInterval: 60_000,
     });
 
@@ -146,9 +148,26 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-                            {ticker}
-                        </h2>
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+                                {ticker}
+                            </h2>
+                            {/* Range Selector */}
+                            <div className="flex bg-white/5 rounded-lg p-0.5">
+                                {['1d', '5d', '1mo'].map((r) => (
+                                    <button
+                                        key={r}
+                                        onClick={() => setRange(r)}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${range === r
+                                            ? "bg-white/10 text-white shadow-sm"
+                                            : "text-text-muted hover:text-text-secondary"
+                                            }`}
+                                    >
+                                        {r.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <p className="text-text-secondary text-sm mt-1">{name}</p>
                     </div>
                     {enrichedPoints.length > 0 && (
@@ -315,6 +334,14 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                         stroke: "var(--bg-primary)",
                                         strokeWidth: 2,
                                     }}
+                                />
+                                <Brush
+                                    dataKey="time"
+                                    height={30}
+                                    stroke="var(--text-muted)"
+                                    fill="rgba(255,255,255,0.02)"
+                                    tickFormatter={() => ""} // hide ticks inside brush for cleaner look
+                                    travellerWidth={10}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
