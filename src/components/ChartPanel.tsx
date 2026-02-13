@@ -124,6 +124,9 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                 — {dataPoint.newsPublisher}
                             </p>
                         )}
+                        <p className="text-[9px] text-electric-purple/70 mt-2 font-medium">
+                            Click ⚡ on chart to read
+                        </p>
                     </div>
                 )}
             </div>
@@ -267,7 +270,14 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                         const { cx, cy, payload } = props;
                                         if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
                                         return (
-                                            <g key={`news-dot-${cx}-${cy}`}>
+                                            <g
+                                                key={`news-dot-${cx}-${cy}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (payload.newsLink) window.open(payload.newsLink, "_blank");
+                                                }}
+                                                style={{ cursor: "pointer" }}
+                                            >
                                                 {/* Outer glow ring */}
                                                 <circle
                                                     cx={cx}
@@ -291,6 +301,8 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                                     y={cy - 16}
                                                     textAnchor="middle"
                                                     fontSize={11}
+                                                    fill="white"
+                                                    fontWeight="bold"
                                                 >
                                                     ⚡
                                                 </text>
@@ -317,9 +329,12 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                             {newsOnChart.map((n, i) => (
-                                <div
+                                <a
                                     key={i}
-                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors group cursor-default"
+                                    href={n.newsItem.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors group cursor-pointer"
                                     onMouseEnter={() => setHoveredNews(n.time)}
                                     onMouseLeave={() => setHoveredNews(null)}
                                 >
@@ -335,14 +350,16 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                         </span>
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-xs text-text-primary leading-snug line-clamp-2 group-hover:text-white transition-colors">
+                                        <p className="text-xs text-text-primary leading-snug line-clamp-2 group-hover:text-electric-purple transition-colors underline-offset-2 group-hover:underline">
                                             {n.newsItem.title}
                                         </p>
-                                        <p className="text-[10px] text-text-muted mt-0.5">
-                                            {n.newsItem.publisher}
-                                        </p>
+                                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-text-muted">
+                                            <span>{n.newsItem.publisher}</span>
+                                            <span className="text-white/20">•</span>
+                                            <span className="text-xs">↗</span>
+                                        </div>
                                     </div>
-                                </div>
+                                </a>
                             ))}
                         </div>
                     </div>

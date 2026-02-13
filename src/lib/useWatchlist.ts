@@ -58,11 +58,25 @@ export function useWatchlist() {
         setTickers(newOrder);
     }, []);
 
+    const moveTicker = useCallback((ticker: string, direction: -1 | 1) => {
+        setTickers((prev) => {
+            const index = prev.indexOf(ticker);
+            if (index === -1) return prev;
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= prev.length) return prev;
+
+            const newArr = [...prev];
+            [newArr[index], newArr[newIndex]] = [newArr[newIndex], newArr[index]];
+            return newArr;
+        });
+    }, []);
+
     return {
         tickers,
         loaded,
         addTicker,
         removeTicker,
         reorderTickers,
+        moveTicker,
     };
 }

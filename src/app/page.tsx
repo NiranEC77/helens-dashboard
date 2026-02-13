@@ -15,9 +15,10 @@ export default function Dashboard() {
   const [view, setView] = useState<ViewMode>("movers");
   const [tickerInput, setTickerInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(5000); // Default 5s
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { tickers: watchlistTickers, loaded: watchlistLoaded, addTicker, removeTicker } = useWatchlist();
+  const { tickers: watchlistTickers, loaded: watchlistLoaded, addTicker, removeTicker, moveTicker } = useWatchlist();
 
   // ── Movers query ──
   const {
@@ -28,7 +29,7 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ["movers"],
     queryFn: fetchMovers,
-    refetchInterval: 30_000,
+    refetchInterval: refreshInterval,
     enabled: view === "movers",
   });
 
@@ -41,7 +42,7 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ["watchlist", watchlistTickers],
     queryFn: () => fetchWatchlist(watchlistTickers),
-    refetchInterval: 30_000,
+    refetchInterval: refreshInterval,
     enabled: view === "watchlist" && watchlistLoaded && watchlistTickers.length > 0,
   });
 
@@ -103,8 +104,8 @@ export default function Dashboard() {
             <button
               onClick={() => setView("movers")}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${view === "movers"
-                  ? "bg-gradient-to-r from-neon-teal/20 to-electric-purple/20 text-white border border-white/10"
-                  : "text-text-muted hover:text-text-secondary"
+                ? "bg-gradient-to-r from-neon-teal/20 to-electric-purple/20 text-white border border-white/10"
+                : "text-text-muted hover:text-text-secondary"
                 }`}
             >
               <span className="text-sm">🔥</span>
@@ -113,8 +114,8 @@ export default function Dashboard() {
             <button
               onClick={() => setView("watchlist")}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${view === "watchlist"
-                  ? "bg-gradient-to-r from-electric-purple/20 to-accent-pink/20 text-white border border-white/10"
-                  : "text-text-muted hover:text-text-secondary"
+                ? "bg-gradient-to-r from-electric-purple/20 to-accent-pink/20 text-white border border-white/10"
+                : "text-text-muted hover:text-text-secondary"
                 }`}
             >
               <span className="text-sm">⭐</span>
@@ -144,6 +145,23 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+
+          {/* Refresh rate toggle */}
+          <div className="hidden md:flex items-center gap-1 bg-white/5 rounded-lg p-1 text-[10px] font-semibold">
+            <span className="px-2 text-text-muted">Refresh:</span>
+            {[1000, 2000, 5000].map((ms) => (
+              <button
+                key={ms}
+                onClick={() => setRefreshInterval(ms)}
+                className={`px-2 py-1 rounded transition-all ${refreshInterval === ms
+                  ? "bg-white/10 text-white"
+                  : "text-text-muted hover:text-text-secondary"
+                  }`}
+              >
+                {ms / 1000}s
+              </button>
+            ))}
+          </div>
 
           {/* Live indicator */}
           <div className="flex items-center gap-2 text-xs text-text-muted">
@@ -209,19 +227,36 @@ export default function Dashboard() {
 
             {/* Ticker chips */}
             <div className="flex flex-wrap gap-2">
-              {watchlistTickers.map((t) => (
+              {watchlistTickers.map((t, idx) => (
                 <span
                   key={t}
-                  className="ticker-chip group"
+                  className="ticker-chip group pl-2 pr-1"
                 >
-                  <span className="text-xs font-semibold">{t}</span>
-                  <button
-                    onClick={() => removeTicker(t)}
-                    className="remove-chip-btn"
-                    aria-label={`Remove ${t}`}
-                  >
-                    ✕
-                  </button>
+                  <span className="text-xs font-semibold mr-1">{t}</span>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => moveTicker(t, -1)}
+                      disabled={idx === 0}
+                      className="w-4 h-4 flex items-center justify-center text-[10px] text-text-muted hover:text-white disabled:opacity-30 disabled:hover:text-text-muted"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={() => moveTicker(t, 1)}
+                      disabled={idx === watchlistTickers.length - 1}
+                      className="w-4 h-4 flex items-center justify-center text-[10px] text-text-muted hover:text-white disabled:opacity-30 disabled:hover:text-text-muted"
+                    >
+                      →
+                    </button>
+                    <div className="w-px h-3 bg-white/10 mx-1" />
+                    <button
+                      onClick={() => removeTicker(t)}
+                      className="w-4 h-4 flex items-center justify-center text-[10px] text-text-muted hover:text-danger"
+                      aria-label={`Remove ${t}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </span>
               ))}
             </div>
