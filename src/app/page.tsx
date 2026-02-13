@@ -132,8 +132,15 @@ export default function Dashboard() {
               Unable to fetch market data
             </p>
             <p className="text-text-secondary text-sm">
-              Make sure the backend is running on{" "}
-              <code className="text-accent-pink">localhost:8000</code>
+              Could not reach the API at{" "}
+              <code className="text-accent-pink">
+                {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}
+              </code>
+            </p>
+            <p className="text-text-muted text-xs mt-2">
+              {process.env.NEXT_PUBLIC_API_URL
+                ? "The backend may be starting up — try refreshing in a moment."
+                : "Set NEXT_PUBLIC_API_URL to your deployed backend URL."}
             </p>
           </div>
         )}

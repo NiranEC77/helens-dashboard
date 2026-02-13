@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import traceback
+import os
 
 # ── Cache for offline fallback ──
 CACHE_PATH = Path(__file__).parent / "movers_cache.json"
@@ -35,7 +36,7 @@ app = FastAPI(title="Anti-Gravity API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
