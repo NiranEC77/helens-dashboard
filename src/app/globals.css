@@ -189,3 +189,116 @@ body::before {
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
 }
+
+/* ---- Watchlist UI ---- */
+.add-ticker-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.add-ticker-btn:hover {
+  background: rgba(167, 139, 250, 0.12);
+  border-color: var(--electric-purple);
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
+  color: var(--electric-purple);
+}
+
+.ticker-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Quicksand', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  width: 200px;
+  letter-spacing: 0.5px;
+  transition: all 0.25s ease;
+}
+
+.ticker-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.ticker-input:focus {
+  border-color: var(--electric-purple);
+  background: rgba(167, 139, 250, 0.06);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+}
+
+.add-ticker-submit {
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--electric-purple), var(--accent-pink));
+  color: white;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.add-ticker-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(167, 139, 250, 0.4);
+}
+
+.ticker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.ticker-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.remove-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.ticker-chip:hover .remove-chip-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.remove-chip-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}

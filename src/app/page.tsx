@@ -1,39 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMovers, type Mover } from "@/lib/api";
+import { fetchMovers, fetchWatchlist, type Mover } from "@/lib/api";
+import { useWatchlist } from "@/lib/useWatchlist";
 import StockCard from "@/components/StockCard";
 import ChartPanel from "@/components/ChartPanel";
+
+type ViewMode = "movers" | "watchlist";
 
 export default function Dashboard() {
   const [selectedTicker, setSelectedTicker] = useState<Mover | null>(null);
   const [filter, setFilter] = useState<"all" | "gainers" | "losers">("all");
+  const [view, setView] = useState<ViewMode>("movers");
+  const [tickerInput, setTickerInput] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
+  const { tickers: watchlistTickers, loaded: watchlistLoaded, addTicker, removeTicker } = useWatchlist();
+
+  // ── Movers query ──
   const {
-    data,
-    isLoading,
-    error,
-    dataUpdatedAt,
+    data: moversData,
+    isLoading: moversLoading,
+    error: moversError,
+    dataUpdatedAt: moversUpdatedAt,
   } = useQuery({
     queryKey: ["movers"],
     queryFn: fetchMovers,
     refetchInterval: 30_000,
+    enabled: view === "movers",
   });
 
-  const movers = data?.movers ?? [];
-  const source = data?.source ?? "live";
+  // ── Watchlist query ──
+  const {
+    data: watchlistData,
+    isLoading: watchlistLoading,
+    error: watchlistError,
+    dataUpdatedAt: watchlistUpdatedAt,
+  } = useQuery({
+    queryKey: ["watchlist", watchlistTickers],
+    queryFn: () => fetchWatchlist(watchlistTickers),
+    refetchInterval: 30_000,
+    enabled: view === "watchlist" && watchlistLoaded && watchlistTickers.length > 0,
+  });
+
+  // Derive active data based on view
+  const isMoversView = view === "movers";
+  const stocks = isMoversView
+    ? (moversData?.movers ?? [])
+    : (watchlistData?.stocks ?? []);
+  const source = isMoversView ? (moversData?.source ?? "live") : "live";
+  const isLoading = isMoversView ? moversLoading : (watchlistLoading && watchlistTickers.length > 0);
+  const error = isMoversView ? moversError : watchlistError;
+  const dataUpdatedAt = isMoversView ? moversUpdatedAt : watchlistUpdatedAt;
 
   const filtered =
     filter === "all"
-      ? movers
+      ? stocks
       : filter === "gainers"
-        ? movers.filter((m) => m.gapPct > 0)
-        : movers.filter((m) => m.gapPct < 0);
+        ? stocks.filter((m) => m.gapPct > 0)
+        : stocks.filter((m) => m.gapPct < 0);
 
   const lastUpdated = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString()
     : null;
+
+  const handleAddTicker = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const val = tickerInput.trim().toUpperCase();
+    if (!val) return;
+
+    // Support comma-separated input: "AAPL, MSFT, VOO"
+    const newTickers = val.split(",").map((t) => t.trim()).filter((t) => t.length > 0);
+    newTickers.forEach(addTicker);
+    setTickerInput("");
+    inputRef.current?.focus();
+  };
 
   return (
     <div className="relative z-10 min-h-screen">
@@ -54,22 +97,53 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Filter tabs */}
-          <div className="hidden sm:flex items-center bg-white/5 rounded-xl p-1 text-xs font-semibold">
-            {(["all", "gainers", "losers"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3.5 py-1.5 rounded-lg capitalize transition-all ${filter === f
-                  ? "bg-white/10 text-white"
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex items-center bg-white/5 rounded-xl p-1 text-xs font-semibold">
+            <button
+              onClick={() => setView("movers")}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${view === "movers"
+                  ? "bg-gradient-to-r from-neon-teal/20 to-electric-purple/20 text-white border border-white/10"
                   : "text-text-muted hover:text-text-secondary"
-                  }`}
-              >
-                {f}
-              </button>
-            ))}
+                }`}
+            >
+              <span className="text-sm">🔥</span>
+              <span className="hidden sm:inline">Movers</span>
+            </button>
+            <button
+              onClick={() => setView("watchlist")}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${view === "watchlist"
+                  ? "bg-gradient-to-r from-electric-purple/20 to-accent-pink/20 text-white border border-white/10"
+                  : "text-text-muted hover:text-text-secondary"
+                }`}
+            >
+              <span className="text-sm">⭐</span>
+              <span className="hidden sm:inline">Watchlist</span>
+              {watchlistTickers.length > 0 && (
+                <span className="bg-white/10 text-text-secondary text-[10px] px-1.5 py-0.5 rounded-full">
+                  {watchlistTickers.length}
+                </span>
+              )}
+            </button>
           </div>
+
+          {/* Filter tabs (movers only) */}
+          {isMoversView && (
+            <div className="hidden sm:flex items-center bg-white/5 rounded-xl p-1 text-xs font-semibold">
+              {(["all", "gainers", "losers"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-3.5 py-1.5 rounded-lg capitalize transition-all ${filter === f
+                    ? "bg-white/10 text-white"
+                    : "text-text-muted hover:text-text-secondary"
+                    }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Live indicator */}
           <div className="flex items-center gap-2 text-xs text-text-muted">
@@ -86,10 +160,78 @@ export default function Dashboard() {
 
       {/* ── Main content ── */}
       <main className="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
+
+        {/* ── Watchlist toolbar ── */}
+        {!isMoversView && (
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            {/* Add ticker button / input */}
+            {!showAddForm ? (
+              <button
+                onClick={() => {
+                  setShowAddForm(true);
+                  setTimeout(() => inputRef.current?.focus(), 50);
+                }}
+                className="add-ticker-btn"
+                id="add-ticker-btn"
+              >
+                <span className="text-base leading-none">+</span>
+                Add Stock
+              </button>
+            ) : (
+              <form
+                onSubmit={handleAddTicker}
+                className="flex items-center gap-2 animate-fade-in-up"
+                style={{ animationDuration: "0.2s" }}
+              >
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={tickerInput}
+                  onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
+                  placeholder="AAPL, VOO, BTC-USD…"
+                  className="ticker-input"
+                  id="ticker-input"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button type="submit" className="add-ticker-submit" id="add-ticker-submit">
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddForm(false); setTickerInput(""); }}
+                  className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1.5"
+                >
+                  ✕
+                </button>
+              </form>
+            )}
+
+            {/* Ticker chips */}
+            <div className="flex flex-wrap gap-2">
+              {watchlistTickers.map((t) => (
+                <span
+                  key={t}
+                  className="ticker-chip group"
+                >
+                  <span className="text-xs font-semibold">{t}</span>
+                  <button
+                    onClick={() => removeTicker(t)}
+                    className="remove-chip-btn"
+                    aria-label={`Remove ${t}`}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Summary bar */}
-        {movers.length > 0 && (
+        {stocks.length > 0 && (
           <div className="flex items-center gap-4 mb-6 text-xs text-text-muted flex-wrap">
-            {source !== "live" && (
+            {isMoversView && source !== "live" && (
               <span className="glass-card px-3 py-1.5 !rounded-lg hover:!transform-none border !border-electric-orange/30">
                 🕐 <strong className="text-electric-orange">
                   {source === "previous_close" ? "LAST SESSION" : "CACHED"}
@@ -99,18 +241,18 @@ export default function Dashboard() {
               </span>
             )}
             <span className="glass-card px-3 py-1.5 !rounded-lg hover:!transform-none">
-              📊 Tracking <strong className="text-white">{movers.length}</strong> stocks
+              📊 Tracking <strong className="text-white">{stocks.length}</strong> stocks
             </span>
             <span className="glass-card px-3 py-1.5 !rounded-lg hover:!transform-none">
               🟢 Gainers:{" "}
               <strong className="text-neon-teal">
-                {movers.filter((m) => m.gapPct > 0).length}
+                {stocks.filter((m) => m.gapPct > 0).length}
               </strong>
             </span>
             <span className="glass-card px-3 py-1.5 !rounded-lg hover:!transform-none">
               🔻 Losers:{" "}
               <strong className="text-electric-orange">
-                {movers.filter((m) => m.gapPct < 0).length}
+                {stocks.filter((m) => m.gapPct < 0).length}
               </strong>
             </span>
           </div>
@@ -119,7 +261,7 @@ export default function Dashboard() {
         {/* Loading state */}
         {isLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 12 }).map((_, i) => (
+            {Array.from({ length: isMoversView ? 12 : watchlistTickers.length || 8 }).map((_, i) => (
               <div key={i} className="skeleton h-52" />
             ))}
           </div>
@@ -132,21 +274,38 @@ export default function Dashboard() {
               Unable to fetch market data
             </p>
             <p className="text-text-secondary text-sm">
-              Could not reach the API at{" "}
-              <code className="text-accent-pink">
-                {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}
-              </code>
-            </p>
-            <p className="text-text-muted text-xs mt-2">
-              {process.env.NEXT_PUBLIC_API_URL
-                ? "The backend may be starting up — try refreshing in a moment."
-                : "Set NEXT_PUBLIC_API_URL to your deployed backend URL."}
+              {isMoversView
+                ? "Could not load top movers. Try refreshing."
+                : "Could not load watchlist data. Check your tickers and try again."}
             </p>
           </div>
         )}
 
+        {/* Watchlist empty state */}
+        {!isMoversView && !isLoading && !error && watchlistTickers.length === 0 && (
+          <div className="glass-card p-16 text-center">
+            <div className="text-5xl mb-4">⭐</div>
+            <p className="text-white text-lg font-bold mb-2">
+              Your watchlist is empty
+            </p>
+            <p className="text-text-secondary text-sm mb-6">
+              Add stocks and ETFs you care about to track them here.
+            </p>
+            <button
+              onClick={() => {
+                setShowAddForm(true);
+                setTimeout(() => inputRef.current?.focus(), 50);
+              }}
+              className="add-ticker-btn inline-flex"
+            >
+              <span className="text-base leading-none">+</span>
+              Add your first stock
+            </button>
+          </div>
+        )}
+
         {/* Cards grid */}
-        {!isLoading && !error && (
+        {!isLoading && !error && filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((mover, i) => (
               <StockCard
@@ -160,7 +319,7 @@ export default function Dashboard() {
         )}
 
         {/* Empty filter state */}
-        {!isLoading && !error && filtered.length === 0 && movers.length > 0 && (
+        {!isLoading && !error && filtered.length === 0 && stocks.length > 0 && (
           <div className="glass-card p-12 text-center">
             <p className="text-text-secondary">
               No {filter} to show right now.

@@ -66,6 +66,18 @@ export async function fetchNews(ticker: string): Promise<NewsResponse> {
     return res.json();
 }
 
+export interface WatchlistResponse {
+    stocks: Mover[];
+    timestamp: string;
+}
+
+export async function fetchWatchlist(tickers: string[]): Promise<WatchlistResponse> {
+    if (tickers.length === 0) return { stocks: [], timestamp: new Date().toISOString() };
+    const res = await fetch(`${API_BASE}/api/watchlist?tickers=${tickers.join(",")}`);
+    if (!res.ok) throw new Error(`Failed to fetch watchlist: ${res.status}`);
+    return res.json();
+}
+
 export function formatPrice(n: number): string {
     return new Intl.NumberFormat("en-US", {
         style: "currency",
