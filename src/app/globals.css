@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0d0d12;
+  --bg-secondary: #13131a;
+  --bg-card: rgba(255, 255, 255, 0.04);
+  --bg-card-hover: rgba(255, 255, 255, 0.07);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --text-primary: #f0f0f5;
+  --text-secondary: #8a8a9a;
+  --text-muted: #55556a;
+  --neon-teal: #2dd4bf;
+  --neon-teal-glow: rgba(45, 212, 191, 0.35);
+  --electric-purple: #a78bfa;
+  --electric-purple-glow: rgba(167, 139, 250, 0.3);
+  --electric-orange: #fb923c;
+  --electric-orange-glow: rgba(251, 146, 60, 0.35);
+  --accent-pink: #f472b6;
+  --danger: #ef4444;
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --color-neon-teal: var(--neon-teal);
+  --color-electric-purple: var(--electric-purple);
+  --color-electric-orange: var(--electric-orange);
+  --color-accent-pink: var(--accent-pink);
+  --color-glass-bg: var(--bg-card);
+  --color-glass-border: var(--border-glass);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --font-sans: 'Quicksand', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Quicksand', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Ambient background gradient */
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse 600px 400px at 20% 30%,
+      rgba(45, 212, 191, 0.06) 0%,
+      transparent 70%),
+    radial-gradient(ellipse 500px 500px at 80% 60%,
+      rgba(167, 139, 250, 0.05) 0%,
+      transparent 70%),
+    radial-gradient(ellipse 400px 300px at 50% 80%,
+      rgba(251, 146, 60, 0.04) 0%,
+      transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---- Glassmorphism card ---- */
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-glass);
+  border-radius: 20px;
+  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.glass-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Gap pills ---- */
+.gap-pill-up {
+  background: rgba(45, 212, 191, 0.15);
+  color: var(--neon-teal);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  box-shadow: 0 0 16px var(--neon-teal-glow);
+}
+
+.gap-pill-down {
+  background: rgba(251, 146, 60, 0.15);
+  color: var(--electric-orange);
+  border: 1px solid rgba(251, 146, 60, 0.3);
+  box-shadow: 0 0 16px var(--electric-orange-glow);
+}
+
+/* ---- Glow effects ---- */
+.glow-teal {
+  box-shadow: 0 0 20px var(--neon-teal-glow), 0 0 60px rgba(45, 212, 191, 0.1);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px var(--electric-purple-glow), 0 0 60px rgba(167, 139, 250, 0.1);
+}
+
+.glow-orange {
+  box-shadow: 0 0 20px var(--electric-orange-glow), 0 0 60px rgba(251, 146, 60, 0.1);
+}
+
+/* ---- Scrollbar styling ---- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ---- Animations ---- */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.skeleton {
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.04) 25%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+}
+
+/* Chart panel overlay */
+.chart-overlay {
+  background: rgba(13, 13, 18, 0.85);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+}
