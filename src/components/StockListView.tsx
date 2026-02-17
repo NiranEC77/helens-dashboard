@@ -97,7 +97,7 @@ export default function StockListView({ stocks, onSelect }: StockListViewProps) 
                             <span className="text-sm font-bold" style={{ color: accentColor }}>
                                 {isUp ? "+" : "-"}${changeVal}
                             </span>
-                            <span className="text-text-secondary text-[11px] ml-1">
+                            <span className="text-sm font-bold ml-1" style={{ color: accentColor }}>
                                 ({pctVal}%)
                             </span>
                         </div>
