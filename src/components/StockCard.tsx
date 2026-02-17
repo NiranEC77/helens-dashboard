@@ -38,7 +38,7 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                             className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${isUp ? "gap-pill-up" : "gap-pill-down"
                                 }`}
                         >
-                            {isUp ? "▲" : "▼"} {Math.abs(mover.gapPct).toFixed(2)}%
+                            {isUp ? "▲" : "▼"} ${Math.abs(mover.price - mover.prevClose).toFixed(2)} ({Math.abs(mover.gapPct).toFixed(2)}%)
                         </span>
                     </div>
                     <p className="text-text-secondary text-xs mt-0.5 truncate pr-2">
@@ -54,19 +54,19 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
             <p className="text-2xl font-bold tracking-tight mb-1" style={{ color: accentColor }}>
                 {formatPrice(mover.price)}
             </p>
-            <p className="text-text-muted text-xs mb-4">
+            <p className="text-text-secondary text-xs mb-4">
                 Prev: {formatPrice(mover.prevClose)}
             </p>
 
             {/* Sparkline */}
             {sparkData.length > 1 && (
-                <div className="h-10 -mx-1 mb-3">
+                <div className="h-16 -mx-1 mb-3">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={sparkData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                             <YAxis type="number" domain={['dataMin', 'dataMax']} hide />
                             <defs>
                                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor={accentColor} stopOpacity={0.25} />
+                                    <stop offset="5%" stopColor={accentColor} stopOpacity={0.4} />
                                     <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
                                 </linearGradient>
                             </defs>
@@ -75,7 +75,7 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                 dataKey="v"
                                 stroke={accentColor}
                                 fill={`url(#${gradientId})`}
-                                strokeWidth={1.5}
+                                strokeWidth={2}
                                 dot={false}
                                 isAnimationActive={false}
                             />
@@ -85,13 +85,13 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
             )}
 
             {/* Bottom stats row */}
-            <div className="flex items-center justify-between text-[11px] text-text-muted">
+            <div className="flex items-center justify-between text-[11px] text-text-secondary font-medium">
                 <span>Vol: {formatVolume(mover.volume)}</span>
                 <span>MCap: {formatMarketCap(mover.marketCap)}</span>
             </div>
 
             {/* Hover hint */}
-            <div className="mt-3 text-center opacity-0 group-hover:opacity-100 transition-opacity text-text-muted text-[10px] tracking-wider uppercase">
+            <div className="mt-3 text-center opacity-0 group-hover:opacity-100 transition-opacity text-text-secondary text-[10px] tracking-wider uppercase font-bold">
                 View Chart →
             </div>
         </button>
