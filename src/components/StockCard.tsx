@@ -6,6 +6,7 @@ import {
     ResponsiveContainer,
     YAxis,
     ReferenceLine,
+    Tooltip,
 } from "recharts";
 import VolumeRing from "./VolumeRing";
 import { type Mover, formatPrice, formatVolume, formatMarketCap } from "@/lib/api";
@@ -16,9 +17,32 @@ interface StockCardProps {
     onClick: () => void;
 }
 
+/* Compact sparkline tooltip */
+function SparkTooltip({ active, payload }: any) {
+    if (!active || !payload?.length) return null;
+    const val = payload[0].value as number;
+    return (
+        <div
+            style={{
+                background: "rgba(20, 20, 30, 0.95)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 6,
+                padding: "3px 8px",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#f0f0f5",
+                whiteSpace: "nowrap",
+            }}
+        >
+            ${val.toFixed(2)}
+        </div>
+    );
+}
+
 export default function StockCard({ mover, index, onClick }: StockCardProps) {
     const isUp = mover.gapPct >= 0;
     const accentColor = isUp ? "var(--neon-teal)" : "var(--electric-orange)";
+    const refLineColor = isUp ? "rgba(45, 212, 191, 0.5)" : "rgba(251, 146, 60, 0.5)";
     const gradientId = `spark-${mover.ticker}`;
 
     // Sparkline data
@@ -28,9 +52,9 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
     const allValues = [...mover.sparkline, mover.prevClose];
     const minVal = Math.min(...allValues);
     const maxVal = Math.max(...allValues);
-    // Add 1% padding to avoid line touching edges exactly
-    const domainMin = minVal - (maxVal - minVal) * 0.05;
-    const domainMax = maxVal + (maxVal - minVal) * 0.05;
+    const range = maxVal - minVal || 1;
+    const domainMin = minVal - range * 0.08;
+    const domainMax = maxVal + range * 0.08;
 
     return (
         <button
@@ -79,11 +103,16 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                     <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
                                 </linearGradient>
                             </defs>
+                            <Tooltip
+                                content={<SparkTooltip />}
+                                cursor={{ stroke: "rgba(255,255,255,0.25)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                                isAnimationActive={false}
+                            />
                             <ReferenceLine
                                 y={mover.prevClose}
-                                stroke="rgba(255, 255, 255, 0.2)"
-                                strokeDasharray="3 3"
-                                strokeWidth={1}
+                                stroke={refLineColor}
+                                strokeDasharray="4 3"
+                                strokeWidth={1.5}
                             />
                             <Area
                                 type="monotone"
@@ -93,6 +122,12 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                 strokeWidth={2}
                                 dot={false}
                                 isAnimationActive={false}
+                                activeDot={{
+                                    r: 4,
+                                    fill: accentColor,
+                                    stroke: "var(--bg-primary)",
+                                    strokeWidth: 2,
+                                }}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
