@@ -245,7 +245,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                 />
                                 <XAxis
                                     dataKey="time"
-                                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                                    tick={{ fill: "var(--text-secondary)", fontSize: 11 }}
                                     axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
                                     tickLine={false}
                                     interval="preserveStartEnd"
@@ -253,7 +253,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                 />
                                 <YAxis
                                     domain={["auto", "auto"]}
-                                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                                    tick={{ fill: "var(--text-secondary)", fontSize: 11 }}
                                     axisLine={false}
                                     tickLine={false}
                                     width={60}
@@ -338,7 +338,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                 <Brush
                                     dataKey="time"
                                     height={30}
-                                    stroke="var(--text-muted)"
+                                    stroke="var(--text-secondary)"
                                     fill="rgba(255,255,255,0.02)"
                                     tickFormatter={() => ""} // hide ticks inside brush for cleaner look
                                     travellerWidth={10}

@@ -4,6 +4,7 @@ import {
     AreaChart,
     Area,
     ResponsiveContainer,
+    YAxis,
 } from "recharts";
 import VolumeRing from "./VolumeRing";
 import { type Mover, formatPrice, formatVolume, formatMarketCap } from "@/lib/api";
@@ -62,6 +63,7 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                 <div className="h-10 -mx-1 mb-3">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={sparkData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                            <YAxis type="number" domain={['dataMin', 'dataMax']} hide />
                             <defs>
                                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor={accentColor} stopOpacity={0.25} />
@@ -72,9 +74,10 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                 type="monotone"
                                 dataKey="v"
                                 stroke={accentColor}
-                                strokeWidth={1.5}
                                 fill={`url(#${gradientId})`}
+                                strokeWidth={1.5}
                                 dot={false}
+                                isAnimationActive={false}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
