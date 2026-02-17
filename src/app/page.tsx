@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMovers, fetchWatchlist, type Mover } from "@/lib/api";
 import { useWatchlist } from "@/lib/useWatchlist";
 import StockCard from "@/components/StockCard";
+import StockListView from "@/components/StockListView";
 import ChartPanel from "@/components/ChartPanel";
 
 type ViewMode = "movers" | "watchlist";
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const [tickerInput, setTickerInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(5000); // Default 5s
+  const [layout, setLayout] = useState<"cards" | "list">("cards");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { tickers: watchlistTickers, loaded: watchlistLoaded, addTicker, removeTicker, moveTicker } = useWatchlist();
@@ -145,6 +147,30 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+
+          {/* Layout toggle */}
+          <div className="flex items-center bg-white/5 rounded-xl p-1 text-xs font-semibold">
+            <button
+              onClick={() => setLayout("cards")}
+              className={`px-2.5 py-1.5 rounded-lg transition-all ${layout === "cards"
+                ? "bg-white/10 text-white"
+                : "text-text-muted hover:text-text-secondary"
+                }`}
+              title="Card view"
+            >
+              ▦
+            </button>
+            <button
+              onClick={() => setLayout("list")}
+              className={`px-2.5 py-1.5 rounded-lg transition-all ${layout === "list"
+                ? "bg-white/10 text-white"
+                : "text-text-muted hover:text-text-secondary"
+                }`}
+              title="List view"
+            >
+              ☰
+            </button>
+          </div>
 
           {/* Refresh rate toggle */}
           <div className="hidden md:flex items-center gap-1 bg-white/5 rounded-lg p-1 text-[10px] font-semibold">
@@ -339,18 +365,25 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Cards grid */}
+        {/* Stock display */}
         {!isLoading && !error && filtered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((mover, i) => (
-              <StockCard
-                key={mover.ticker}
-                mover={mover}
-                index={i}
-                onClick={() => setSelectedTicker(mover)}
-              />
-            ))}
-          </div>
+          layout === "list" ? (
+            <StockListView
+              stocks={filtered}
+              onSelect={(mover) => setSelectedTicker(mover)}
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filtered.map((mover, i) => (
+                <StockCard
+                  key={mover.ticker}
+                  mover={mover}
+                  index={i}
+                  onClick={() => setSelectedTicker(mover)}
+                />
+              ))}
+            </div>
+          )
         )}
 
         {/* Empty filter state */}

@@ -47,7 +47,7 @@ WATCHLIST = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD",
     "NFLX", "INTC", "BA", "DIS", "PLTR", "SOFI", "RIVN", "LCID",
     "NIO", "COIN", "MARA", "RIOT", "SQ", "SNAP", "UBER", "PYPL",
-    "ROKU", "SHOP", "CRWD", "SNOW", "DKNG", "ABNB",
+    "ROKU", "SHOP", "CRWD", "SNOW", "DKNG", "ABNB", "BTC-USD",
 ]
 
 
