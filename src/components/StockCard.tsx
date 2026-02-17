@@ -5,6 +5,7 @@ import {
     Area,
     ResponsiveContainer,
     YAxis,
+    ReferenceLine,
 } from "recharts";
 import VolumeRing from "./VolumeRing";
 import { type Mover, formatPrice, formatVolume, formatMarketCap } from "@/lib/api";
@@ -22,6 +23,14 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
 
     // Sparkline data
     const sparkData = mover.sparkline.map((v, i) => ({ v, i }));
+
+    // Calculate domain to include prevClose
+    const allValues = [...mover.sparkline, mover.prevClose];
+    const minVal = Math.min(...allValues);
+    const maxVal = Math.max(...allValues);
+    // Add 1% padding to avoid line touching edges exactly
+    const domainMin = minVal - (maxVal - minVal) * 0.05;
+    const domainMax = maxVal + (maxVal - minVal) * 0.05;
 
     return (
         <button
@@ -63,13 +72,19 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                 <div className="h-16 -mx-1 mb-3">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={sparkData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-                            <YAxis type="number" domain={['dataMin', 'dataMax']} hide />
+                            <YAxis type="number" domain={[domainMin, domainMax]} hide />
                             <defs>
                                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor={accentColor} stopOpacity={0.4} />
                                     <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
                                 </linearGradient>
                             </defs>
+                            <ReferenceLine
+                                y={mover.prevClose}
+                                stroke="rgba(255, 255, 255, 0.2)"
+                                strokeDasharray="3 3"
+                                strokeWidth={1}
+                            />
                             <Area
                                 type="monotone"
                                 dataKey="v"
