@@ -322,14 +322,14 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     vertical={false}
                                 />
 
-                                {/* Subtle session background zones */}
+                                {/* Session background zones */}
                                 {hasSessions && preBoundary && (
                                     <ReferenceArea
                                         x1={preBoundary.startTime}
                                         x2={preBoundary.endTime}
-                                        fill="rgba(167,139,250,0.04)"
+                                        fill="rgba(167,139,250,0.10)"
                                         fillOpacity={1}
-                                        stroke="rgba(167,139,250,0.1)"
+                                        stroke="rgba(167,139,250,0.2)"
                                         strokeDasharray="4 4"
                                     />
                                 )}
@@ -337,10 +337,30 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     <ReferenceArea
                                         x1={postBoundary.startTime}
                                         x2={postBoundary.endTime}
-                                        fill="rgba(245,158,11,0.03)"
+                                        fill="rgba(245,158,11,0.08)"
                                         fillOpacity={1}
-                                        stroke="rgba(245,158,11,0.08)"
+                                        stroke="rgba(245,158,11,0.15)"
                                         strokeDasharray="4 4"
+                                    />
+                                )}
+
+                                {/* Vertical separator lines at session boundaries */}
+                                {hasSessions && preBoundary && (
+                                    <ReferenceLine
+                                        x={preBoundary.endTime}
+                                        stroke="rgba(167,139,250,0.4)"
+                                        strokeDasharray="6 3"
+                                        strokeWidth={1.5}
+                                        label={{ value: "PRE", position: "insideTopLeft", fill: "rgba(167,139,250,0.6)", fontSize: 9, fontWeight: 700 }}
+                                    />
+                                )}
+                                {hasSessions && postBoundary && (
+                                    <ReferenceLine
+                                        x={postBoundary.startTime}
+                                        stroke="rgba(245,158,11,0.35)"
+                                        strokeDasharray="6 3"
+                                        strokeWidth={1.5}
+                                        label={{ value: "AH", position: "insideTopRight", fill: "rgba(245,158,11,0.6)", fontSize: 9, fontWeight: 700 }}
                                     />
                                 )}
 

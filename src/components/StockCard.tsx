@@ -170,13 +170,13 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                 strokeWidth={1.5}
                             />
 
-                            {/* Very subtle session background zones */}
+                            {/* Session background zones */}
                             {hasSessions && sessionBoundaries.filter(b => b.session === "pre").map((b, i) => (
                                 <ReferenceArea
                                     key={`pre-zone-${i}`}
                                     x1={b.startIdx}
                                     x2={b.endIdx}
-                                    fill="rgba(167,139,250,0.06)"
+                                    fill="rgba(167,139,250,0.12)"
                                     fillOpacity={1}
                                     stroke="none"
                                 />
@@ -186,7 +186,7 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                     key={`post-zone-${i}`}
                                     x1={b.startIdx}
                                     x2={b.endIdx}
-                                    fill="rgba(245,158,11,0.05)"
+                                    fill="rgba(245,158,11,0.10)"
                                     fillOpacity={1}
                                     stroke="none"
                                 />
