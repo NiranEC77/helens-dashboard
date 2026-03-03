@@ -68,53 +68,17 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
     const isUp = mover.gapPct >= 0;
     const accentColor = isUp ? "var(--neon-teal)" : "var(--electric-orange)";
     const refLineColor = isUp ? "rgba(45, 212, 191, 0.5)" : "rgba(251, 146, 60, 0.5)";
-
-    const preColor = "#a78bfa";
-    const postColor = "#f59e0b";
+    const gradientId = `spark-${mover.ticker}`;
 
     // Use intraday sparkline if available, otherwise fallback to daily
     const hasIntraday = mover.intradaySparkline && mover.intradaySparkline.length > 1;
 
-    // Intraday data with session split for multi-colored rendering
-    const intradayData = hasIntraday
-        ? mover.intradaySparkline!.map((p, i) => ({
-            v: p.v,
-            i,
-            session: p.session,
-            vPre: p.session === "pre" ? p.v : null,
-            vRegular: p.session === "regular" ? p.v : null,
-            vPost: p.session === "post" ? p.v : null,
-        }))
-        : null;
+    // Single continuous line data — one unified series
+    const sparkData = hasIntraday
+        ? mover.intradaySparkline!.map((p, i) => ({ v: p.v, i, session: p.session }))
+        : mover.sparkline.map((v, i) => ({ v, i, session: "regular" as const }));
 
-    // Bridge gaps at session transitions for connected rendering
-    if (intradayData) {
-        for (let i = 1; i < intradayData.length; i++) {
-            const prev = intradayData[i - 1];
-            const curr = intradayData[i];
-            if (prev.session !== curr.session) {
-                // Copy previous value into current session series
-                if (curr.session === "regular") {
-                    prev.vRegular = prev.v;
-                } else if (curr.session === "post") {
-                    prev.vPost = prev.v;
-                } else if (curr.session === "pre") {
-                    prev.vPre = prev.v;
-                }
-            }
-        }
-    }
-
-    // Daily sparkline fallback
-    const dailyData = mover.sparkline.map((v, i) => ({ v, i }));
-
-    const sparkData = intradayData || dailyData;
     const hasSessions = hasIntraday && mover.intradaySparkline!.some(p => p.session !== "regular");
-
-    // Gradient IDs
-    const gradientId = `spark-${mover.ticker}`;
-    const gradientPreId = `spark-pre-${mover.ticker}`;
-    const gradientPostId = `spark-post-${mover.ticker}`;
 
     // Calculate domain to include prevClose
     const allValues = [
@@ -127,11 +91,12 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
     const domainMin = minVal - range * 0.08;
     const domainMax = maxVal + range * 0.08;
 
-    // Determine session boundary indices for ReferenceArea
+    // Determine session boundary indices for subtle background zones
     const sessionBoundaries: { session: string; startIdx: number; endIdx: number }[] = [];
-    if (intradayData) {
+    if (hasIntraday) {
         let currentSession: string | null = null;
         let startIdx = 0;
+        const intradayData = mover.intradaySparkline!;
         for (let i = 0; i < intradayData.length; i++) {
             if (intradayData[i].session !== currentSession) {
                 if (currentSession) {
@@ -181,28 +146,6 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                 Prev: {formatPrice(mover.prevClose)}
             </p>
 
-            {/* Session legend (only if intraday with extended hours) */}
-            {hasSessions && (
-                <div className="flex items-center gap-2 mb-2 text-[9px] font-bold">
-                    {mover.intradaySparkline!.some(p => p.session === "pre") && (
-                        <span className="flex items-center gap-1" style={{ color: preColor }}>
-                            <span className="w-2 h-1 rounded-sm" style={{ background: preColor, opacity: 0.7 }} />
-                            PRE
-                        </span>
-                    )}
-                    <span className="flex items-center gap-1 text-text-muted">
-                        <span className="w-2 h-1 rounded-sm" style={{ background: accentColor, opacity: 0.7 }} />
-                        REG
-                    </span>
-                    {mover.intradaySparkline!.some(p => p.session === "post") && (
-                        <span className="flex items-center gap-1" style={{ color: postColor }}>
-                            <span className="w-2 h-1 rounded-sm" style={{ background: postColor, opacity: 0.7 }} />
-                            AH
-                        </span>
-                    )}
-                </div>
-            )}
-
             {/* Sparkline */}
             {sparkData.length > 1 && (
                 <div className="h-16 -mx-1 mb-3">
@@ -214,18 +157,6 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                     <stop offset="5%" stopColor={accentColor} stopOpacity={0.4} />
                                     <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
                                 </linearGradient>
-                                {hasSessions && (
-                                    <>
-                                        <linearGradient id={gradientPreId} x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor={preColor} stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor={preColor} stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id={gradientPostId} x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor={postColor} stopOpacity={0.25} />
-                                            <stop offset="95%" stopColor={postColor} stopOpacity={0} />
-                                        </linearGradient>
-                                    </>
-                                )}
                             </defs>
                             <Tooltip
                                 content={<SparkTooltip />}
@@ -239,13 +170,13 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                 strokeWidth={1.5}
                             />
 
-                            {/* Session background zones */}
+                            {/* Very subtle session background zones */}
                             {hasSessions && sessionBoundaries.filter(b => b.session === "pre").map((b, i) => (
                                 <ReferenceArea
                                     key={`pre-zone-${i}`}
                                     x1={b.startIdx}
                                     x2={b.endIdx}
-                                    fill="rgba(167,139,250,0.08)"
+                                    fill="rgba(167,139,250,0.06)"
                                     fillOpacity={1}
                                     stroke="none"
                                 />
@@ -255,80 +186,28 @@ export default function StockCard({ mover, index, onClick }: StockCardProps) {
                                     key={`post-zone-${i}`}
                                     x1={b.startIdx}
                                     x2={b.endIdx}
-                                    fill="rgba(245,158,11,0.06)"
+                                    fill="rgba(245,158,11,0.05)"
                                     fillOpacity={1}
                                     stroke="none"
                                 />
                             ))}
 
-                            {hasSessions ? (
-                                <>
-                                    <Area
-                                        type="monotone"
-                                        dataKey="vPre"
-                                        stroke={preColor}
-                                        fill={`url(#${gradientPreId})`}
-                                        strokeWidth={1.5}
-                                        dot={false}
-                                        isAnimationActive={false}
-                                        connectNulls={false}
-                                        activeDot={{
-                                            r: 3,
-                                            fill: preColor,
-                                            stroke: "var(--bg-primary)",
-                                            strokeWidth: 1.5,
-                                        }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="vRegular"
-                                        stroke={accentColor}
-                                        fill={`url(#${gradientId})`}
-                                        strokeWidth={2}
-                                        dot={false}
-                                        isAnimationActive={false}
-                                        connectNulls={false}
-                                        activeDot={{
-                                            r: 4,
-                                            fill: accentColor,
-                                            stroke: "var(--bg-primary)",
-                                            strokeWidth: 2,
-                                        }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="vPost"
-                                        stroke={postColor}
-                                        fill={`url(#${gradientPostId})`}
-                                        strokeWidth={1.5}
-                                        dot={false}
-                                        isAnimationActive={false}
-                                        connectNulls={false}
-                                        activeDot={{
-                                            r: 3,
-                                            fill: postColor,
-                                            stroke: "var(--bg-primary)",
-                                            strokeWidth: 1.5,
-                                        }}
-                                    />
-                                </>
-                            ) : (
-                                <Area
-                                    type="monotone"
-                                    dataKey="v"
-                                    stroke={accentColor}
-                                    fill={`url(#${gradientId})`}
-                                    strokeWidth={2}
-                                    dot={false}
-                                    isAnimationActive={false}
-                                    activeDot={{
-                                        r: 4,
-                                        fill: accentColor,
-                                        stroke: "var(--bg-primary)",
-                                        strokeWidth: 2,
-                                    }}
-                                />
-                            )}
+                            {/* Single continuous line — same accent color throughout */}
+                            <Area
+                                type="monotone"
+                                dataKey="v"
+                                stroke={accentColor}
+                                fill={`url(#${gradientId})`}
+                                strokeWidth={2}
+                                dot={false}
+                                isAnimationActive={false}
+                                activeDot={{
+                                    r: 4,
+                                    fill: accentColor,
+                                    stroke: "var(--bg-primary)",
+                                    strokeWidth: 2,
+                                }}
+                            />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

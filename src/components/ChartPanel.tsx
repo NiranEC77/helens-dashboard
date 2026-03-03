@@ -36,10 +36,6 @@ interface EnrichedPoint {
     newsPublisher?: string;
     newsLink?: string;
     hasNews?: boolean;
-    // Separate series for session-based coloring
-    closePre: number | null;
-    closeRegular: number | null;
-    closePost: number | null;
 }
 
 export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
@@ -60,12 +56,11 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
     });
 
     const rawPoints = chartData?.points ?? [];
-    const tradingPeriods = chartData?.tradingPeriods ?? null;
     const newsItems = newsData?.news ?? [];
 
     const hasSessions = range === "1d" && rawPoints.some(p => p.session && p.session !== "regular");
 
-    // Merge news into chart points and split into session series
+    // Merge news into chart points and find session boundaries
     const { enrichedPoints, newsOnChart, sessionBoundaries } = useMemo(() => {
         const newsMap = new Map<string, NewsItem>();
         for (const item of newsItems) {
@@ -74,7 +69,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
 
         const matched: { time: string; newsItem: NewsItem; price: number }[] = [];
 
-        // Find session boundary indices for ReferenceArea zones
+        // Find session boundary time labels for ReferenceArea zones
         const boundaries: { session: string; startTime: string; endTime: string }[] = [];
         let currentSession: string | null = null;
         let sessionStart: string | null = null;
@@ -96,32 +91,17 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                 sessionStart = p.time;
             }
 
-            const base: EnrichedPoint = {
+            if (news) {
+                matched.push({ time: p.time, newsItem: news, price: p.close ?? 0 });
+            }
+
+            return {
                 ...p,
                 hasNews: !!news,
                 newsTitle: news?.title,
                 newsPublisher: news?.publisher,
                 newsLink: news?.link,
-                // Split close into per-session series for colored line rendering
-                closePre: null,
-                closeRegular: null,
-                closePost: null,
             };
-
-            // Assign close to the appropriate session series
-            if (session === "pre") {
-                base.closePre = p.close;
-            } else if (session === "post") {
-                base.closePost = p.close;
-            } else {
-                base.closeRegular = p.close;
-            }
-
-            if (news) {
-                matched.push({ time: p.time, newsItem: news, price: p.close ?? 0 });
-            }
-
-            return base;
         });
 
         // Close the last boundary
@@ -131,30 +111,6 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                 startTime: sessionStart,
                 endTime: rawPoints[rawPoints.length - 1]?.time || sessionStart,
             });
-        }
-
-        // Bridge gaps: where sessions meet, duplicate the close value so lines connect
-        for (let i = 1; i < pts.length; i++) {
-            const prev = pts[i - 1];
-            const curr = pts[i];
-            const prevSession = rawPoints[i - 1]?.session || "regular";
-            const currSession = rawPoints[i]?.session || "regular";
-
-            if (prevSession !== currSession && prev.close !== null) {
-                // Copy the last value of the previous session into the current session's series
-                // so the line appears connected
-                if (currSession === "regular") {
-                    curr.closeRegular = curr.closeRegular ?? curr.close;
-                    // Also set on previous point to create overlap
-                    prev.closeRegular = prev.close;
-                } else if (currSession === "post") {
-                    curr.closePost = curr.closePost ?? curr.close;
-                    prev.closePost = prev.close;
-                } else if (currSession === "pre") {
-                    curr.closePre = curr.closePre ?? curr.close;
-                    prev.closePre = prev.close;
-                }
-            }
         }
 
         return { enrichedPoints: pts, newsOnChart: matched, sessionBoundaries: boundaries };
@@ -169,23 +125,20 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
 
     const accentColor = isPositive ? "var(--neon-teal)" : "var(--electric-orange)";
     const gradientId = `chart-gradient-${ticker}`;
-    const gradientPreId = `chart-gradient-pre-${ticker}`;
-    const gradientPostId = `chart-gradient-post-${ticker}`;
 
-    // Session colors
-    const preColor = "#a78bfa";     // Purple for pre-market
-    const postColor = "#f59e0b";    // Amber for post-market
-    const regularColor = isPositive ? "var(--neon-teal)" : "var(--electric-orange)";
+    // Session zone boundaries
+    const preBoundary = sessionBoundaries.find(b => b.session === "pre");
+    const postBoundary = sessionBoundaries.find(b => b.session === "post");
 
-    // Custom tooltip that shows news when hovering on a news point
+    // Custom tooltip with session info
     const CustomTooltip = useCallback(({ active, payload, label }: any) => {
         if (!active || !payload?.length) return null;
         const dataPoint = payload[0]?.payload as EnrichedPoint | undefined;
         const price = dataPoint?.close;
         const session = dataPoint?.session;
 
-        const sessionLabel = session === "pre" ? "Pre-Market" : session === "post" ? "After-Hours" : "Regular";
-        const sessionColor = session === "pre" ? preColor : session === "post" ? postColor : accentColor;
+        const sessionLabel = session === "pre" ? "Pre-Market" : session === "post" ? "After-Hours" : null;
+        const sessionColor = session === "pre" ? "#a78bfa" : session === "post" ? "#f59e0b" : null;
 
         return (
             <div
@@ -197,11 +150,11 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
             >
                 <div className="flex items-center gap-2 mb-1">
                     <p className="text-text-muted text-[11px]">{label}</p>
-                    {session && session !== "regular" && (
+                    {sessionLabel && (
                         <span
                             className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
                             style={{
-                                color: sessionColor,
+                                color: sessionColor!,
                                 background: session === "pre" ? "rgba(167,139,250,0.15)" : "rgba(245,158,11,0.15)",
                             }}
                         >
@@ -209,7 +162,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                         </span>
                     )}
                 </div>
-                <p className="font-bold text-sm" style={{ color: sessionColor }}>
+                <p className="font-bold text-sm" style={{ color: accentColor }}>
                     {price != null ? formatPrice(price) : "—"}
                 </p>
                 {dataPoint?.hasNews && (
@@ -236,10 +189,6 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
             </div>
         );
     }, [accentColor]);
-
-    // Find pre/post market session boundaries for background zones
-    const preBoundary = sessionBoundaries.find(b => b.session === "pre");
-    const postBoundary = sessionBoundaries.find(b => b.session === "post");
 
     return (
         <div
@@ -299,24 +248,24 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                     </button>
                 </div>
 
-                {/* Session legend + news legend */}
+                {/* Legend row */}
                 <div className="flex items-center gap-4 mb-4 flex-wrap">
                     {hasSessions && (
-                        <div className="flex items-center gap-3 text-[11px]">
+                        <div className="flex items-center gap-3 text-[11px] text-text-muted">
                             {preBoundary && (
                                 <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(167,139,250,0.25)", border: "1px solid rgba(167,139,250,0.5)" }} />
-                                    <span style={{ color: preColor }} className="font-semibold">Pre-Market</span>
+                                    <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(167,139,250,0.2)", border: "1px solid rgba(167,139,250,0.4)" }} />
+                                    <span className="font-medium" style={{ color: "rgba(167,139,250,0.7)" }}>Pre-Market</span>
                                 </div>
                             )}
                             <div className="flex items-center gap-1.5">
-                                <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} />
-                                <span className="text-text-secondary font-semibold">Regular</span>
+                                <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }} />
+                                <span className="text-text-secondary font-medium">Regular</span>
                             </div>
                             {postBoundary && (
                                 <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)" }} />
-                                    <span style={{ color: postColor }} className="font-semibold">After-Hours</span>
+                                    <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)" }} />
+                                    <span className="font-medium" style={{ color: "rgba(245,158,11,0.7)" }}>After-Hours</span>
                                 </div>
                             )}
                         </div>
@@ -348,7 +297,6 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                 margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
                             >
                                 <defs>
-                                    {/* Regular gradient */}
                                     <linearGradient
                                         id={gradientId}
                                         x1="0"
@@ -358,50 +306,12 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     >
                                         <stop
                                             offset="5%"
-                                            stopColor={regularColor}
+                                            stopColor={accentColor}
                                             stopOpacity={0.3}
                                         />
                                         <stop
                                             offset="95%"
-                                            stopColor={regularColor}
-                                            stopOpacity={0}
-                                        />
-                                    </linearGradient>
-                                    {/* Pre-market gradient */}
-                                    <linearGradient
-                                        id={gradientPreId}
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="1"
-                                    >
-                                        <stop
-                                            offset="5%"
-                                            stopColor={preColor}
-                                            stopOpacity={0.25}
-                                        />
-                                        <stop
-                                            offset="95%"
-                                            stopColor={preColor}
-                                            stopOpacity={0}
-                                        />
-                                    </linearGradient>
-                                    {/* Post-market gradient */}
-                                    <linearGradient
-                                        id={gradientPostId}
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="1"
-                                    >
-                                        <stop
-                                            offset="5%"
-                                            stopColor={postColor}
-                                            stopOpacity={0.2}
-                                        />
-                                        <stop
-                                            offset="95%"
-                                            stopColor={postColor}
+                                            stopColor={accentColor}
                                             stopOpacity={0}
                                         />
                                     </linearGradient>
@@ -412,14 +322,14 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     vertical={false}
                                 />
 
-                                {/* Session background zones */}
+                                {/* Subtle session background zones */}
                                 {hasSessions && preBoundary && (
                                     <ReferenceArea
                                         x1={preBoundary.startTime}
                                         x2={preBoundary.endTime}
-                                        fill="rgba(167,139,250,0.06)"
+                                        fill="rgba(167,139,250,0.04)"
                                         fillOpacity={1}
-                                        stroke="rgba(167,139,250,0.15)"
+                                        stroke="rgba(167,139,250,0.1)"
                                         strokeDasharray="4 4"
                                     />
                                 )}
@@ -427,9 +337,9 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     <ReferenceArea
                                         x1={postBoundary.startTime}
                                         x2={postBoundary.endTime}
-                                        fill="rgba(245,158,11,0.04)"
+                                        fill="rgba(245,158,11,0.03)"
                                         fillOpacity={1}
-                                        stroke="rgba(245,158,11,0.12)"
+                                        stroke="rgba(245,158,11,0.08)"
                                         strokeDasharray="4 4"
                                     />
                                 )}
@@ -459,7 +369,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     }}
                                 />
 
-                                {/* News reference lines — vertical dashed lines at news points */}
+                                {/* News reference lines */}
                                 {newsOnChart.map((n, i) => (
                                     <ReferenceLine
                                         key={`news-line-${i}`}
@@ -470,169 +380,70 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     />
                                 ))}
 
-                                {/* Session-colored area layers */}
-                                {hasSessions ? (
-                                    <>
-                                        {/* Pre-market line (purple) */}
-                                        <Area
-                                            type="monotone"
-                                            dataKey="closePre"
-                                            stroke={preColor}
-                                            strokeWidth={2}
-                                            fill={`url(#${gradientPreId})`}
-                                            dot={false}
-                                            activeDot={{
-                                                r: 5,
-                                                fill: preColor,
-                                                stroke: "var(--bg-primary)",
-                                                strokeWidth: 2,
-                                            }}
-                                            connectNulls={false}
-                                            isAnimationActive={false}
-                                        />
-                                        {/* Regular market line (teal/orange) */}
-                                        <Area
-                                            type="monotone"
-                                            dataKey="closeRegular"
-                                            stroke={regularColor}
-                                            strokeWidth={2.5}
-                                            fill={`url(#${gradientId})`}
-                                            dot={(props: any) => {
-                                                const { cx, cy, payload } = props;
-                                                if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
-                                                return (
-                                                    <g
-                                                        key={`news-dot-${cx}-${cy}`}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (payload.newsLink) window.open(payload.newsLink, "_blank");
-                                                        }}
-                                                        style={{ cursor: "pointer" }}
-                                                    >
-                                                        {/* Outer glow ring */}
-                                                        <circle
-                                                            cx={cx}
-                                                            cy={cy}
-                                                            r={12}
-                                                            fill="rgba(167,139,250,0.15)"
-                                                            stroke="none"
-                                                        />
-                                                        {/* Inner dot */}
-                                                        <circle
-                                                            cx={cx}
-                                                            cy={cy}
-                                                            r={5}
-                                                            fill="var(--electric-purple)"
-                                                            stroke="var(--bg-primary)"
-                                                            strokeWidth={2}
-                                                        />
-                                                        {/* News icon (⚡) */}
-                                                        <text
-                                                            x={cx}
-                                                            y={cy - 16}
-                                                            textAnchor="middle"
-                                                            fontSize={11}
-                                                            fill="white"
-                                                            fontWeight="bold"
-                                                        >
-                                                            ⚡
-                                                        </text>
-                                                    </g>
-                                                );
-                                            }}
-                                            activeDot={{
-                                                r: 5,
-                                                fill: regularColor,
-                                                stroke: "var(--bg-primary)",
-                                                strokeWidth: 2,
-                                            }}
-                                            connectNulls={false}
-                                            isAnimationActive={false}
-                                        />
-                                        {/* Post-market line (amber) */}
-                                        <Area
-                                            type="monotone"
-                                            dataKey="closePost"
-                                            stroke={postColor}
-                                            strokeWidth={2}
-                                            fill={`url(#${gradientPostId})`}
-                                            dot={false}
-                                            activeDot={{
-                                                r: 5,
-                                                fill: postColor,
-                                                stroke: "var(--bg-primary)",
-                                                strokeWidth: 2,
-                                            }}
-                                            connectNulls={false}
-                                            isAnimationActive={false}
-                                        />
-                                    </>
-                                ) : (
-                                    /* Standard single-color area for multi-day views */
-                                    <Area
-                                        type="monotone"
-                                        dataKey="close"
-                                        stroke={accentColor}
-                                        strokeWidth={2.5}
-                                        fill={`url(#${gradientId})`}
-                                        dot={(props: any) => {
-                                            const { cx, cy, payload } = props;
-                                            if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
-                                            return (
-                                                <g
-                                                    key={`news-dot-${cx}-${cy}`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (payload.newsLink) window.open(payload.newsLink, "_blank");
-                                                    }}
-                                                    style={{ cursor: "pointer" }}
+                                {/* Single continuous line — same color throughout */}
+                                <Area
+                                    type="monotone"
+                                    dataKey="close"
+                                    stroke={accentColor}
+                                    strokeWidth={2.5}
+                                    fill={`url(#${gradientId})`}
+                                    dot={(props: any) => {
+                                        const { cx, cy, payload } = props;
+                                        if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
+                                        return (
+                                            <g
+                                                key={`news-dot-${cx}-${cy}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (payload.newsLink) window.open(payload.newsLink, "_blank");
+                                                }}
+                                                style={{ cursor: "pointer" }}
+                                            >
+                                                {/* Outer glow ring */}
+                                                <circle
+                                                    cx={cx}
+                                                    cy={cy}
+                                                    r={12}
+                                                    fill="rgba(167,139,250,0.15)"
+                                                    stroke="none"
+                                                />
+                                                {/* Inner dot */}
+                                                <circle
+                                                    cx={cx}
+                                                    cy={cy}
+                                                    r={5}
+                                                    fill="var(--electric-purple)"
+                                                    stroke="var(--bg-primary)"
+                                                    strokeWidth={2}
+                                                />
+                                                {/* News icon (⚡) */}
+                                                <text
+                                                    x={cx}
+                                                    y={cy - 16}
+                                                    textAnchor="middle"
+                                                    fontSize={11}
+                                                    fill="white"
+                                                    fontWeight="bold"
                                                 >
-                                                    {/* Outer glow ring */}
-                                                    <circle
-                                                        cx={cx}
-                                                        cy={cy}
-                                                        r={12}
-                                                        fill="rgba(167,139,250,0.15)"
-                                                        stroke="none"
-                                                    />
-                                                    {/* Inner dot */}
-                                                    <circle
-                                                        cx={cx}
-                                                        cy={cy}
-                                                        r={5}
-                                                        fill="var(--electric-purple)"
-                                                        stroke="var(--bg-primary)"
-                                                        strokeWidth={2}
-                                                    />
-                                                    {/* News icon (⚡) */}
-                                                    <text
-                                                        x={cx}
-                                                        y={cy - 16}
-                                                        textAnchor="middle"
-                                                        fontSize={11}
-                                                        fill="white"
-                                                        fontWeight="bold"
-                                                    >
-                                                        ⚡
-                                                    </text>
-                                                </g>
-                                            );
-                                        }}
-                                        activeDot={{
-                                            r: 5,
-                                            fill: accentColor,
-                                            stroke: "var(--bg-primary)",
-                                            strokeWidth: 2,
-                                        }}
-                                    />
-                                )}
+                                                    ⚡
+                                                </text>
+                                            </g>
+                                        );
+                                    }}
+                                    activeDot={{
+                                        r: 5,
+                                        fill: accentColor,
+                                        stroke: "var(--bg-primary)",
+                                        strokeWidth: 2,
+                                    }}
+                                />
 
                                 <Brush
                                     dataKey="time"
                                     height={30}
                                     stroke="var(--text-secondary)"
                                     fill="rgba(255,255,255,0.02)"
-                                    tickFormatter={() => ""} // hide ticks inside brush for cleaner look
+                                    tickFormatter={() => ""}
                                     travellerWidth={10}
                                 />
                             </AreaChart>
