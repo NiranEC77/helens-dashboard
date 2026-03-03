@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMovers, fetchWatchlist, type Mover } from "@/lib/api";
 import { useWatchlist } from "@/lib/useWatchlist";
+import { usePersistedState } from "@/lib/usePersistedState";
 import StockCard from "@/components/StockCard";
 import StockListView from "@/components/StockListView";
 import ChartPanel from "@/components/ChartPanel";
@@ -12,12 +13,12 @@ type ViewMode = "movers" | "watchlist";
 
 export default function Dashboard() {
   const [selectedTicker, setSelectedTicker] = useState<Mover | null>(null);
-  const [filter, setFilter] = useState<"all" | "gainers" | "losers">("all");
-  const [view, setView] = useState<ViewMode>("movers");
+  const [filter, setFilter] = usePersistedState<"all" | "gainers" | "losers">("ag-dashboard-filter", "all", ["all", "gainers", "losers"]);
+  const [view, setView] = usePersistedState<ViewMode>("ag-dashboard-view", "movers", ["movers", "watchlist"]);
   const [tickerInput, setTickerInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(5000); // Default 5s
-  const [layout, setLayout] = useState<"cards" | "list">("cards");
+  const [layout, setLayout] = usePersistedState<"cards" | "list">("ag-dashboard-layout", "cards", ["cards", "list"]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { tickers: watchlistTickers, loaded: watchlistLoaded, addTicker, removeTicker, moveTicker } = useWatchlist();
