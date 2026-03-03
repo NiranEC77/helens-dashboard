@@ -125,9 +125,10 @@ export async function GET(request: Request) {
                 let intradaySparkline: SparkPoint[] = [];
                 try {
                     const now = new Date();
-                    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    const todayMidnight = new Date(now);
+                    todayMidnight.setHours(0, 0, 0, 0);
                     const intradayData = await yf.chart(symbol, {
-                        period1: dayAgo,
+                        period1: todayMidnight,
                         period2: now,
                         interval: "15m",
                         includePrePost: true,

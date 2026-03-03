@@ -54,10 +54,14 @@ export async function GET(
 
         let queryOptions: any = { period2: now, includePrePost: true };
 
+        // Start of today (midnight local) so pre-market is at the beginning of the graph
+        const todayMidnight = new Date(now);
+        todayMidnight.setHours(0, 0, 0, 0);
+
         // Map range to yf params
         switch (range) {
             case "1d":
-                queryOptions.period1 = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000); // 24h
+                queryOptions.period1 = todayMidnight;
                 queryOptions.interval = "1m"; // High res
                 break;
             case "5d":
@@ -69,15 +73,18 @@ export async function GET(
                 queryOptions.interval = "1h"; // Hourly for 1mo
                 break;
             default: // Default to 1d
-                queryOptions.period1 = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+                queryOptions.period1 = todayMidnight;
                 queryOptions.interval = "1m";
         }
 
         let chartData = await yf.chart(ticker, queryOptions);
 
-        // Fallback for 1d if empty (e.g. weekend/closed) -> try 2d
+        // Fallback for 1d if empty (e.g. weekend/closed) -> try yesterday
         if (range === "1d" && (!chartData.quotes || chartData.quotes.length === 0)) {
-            queryOptions.period1 = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 48h
+            const yesterdayMidnight = new Date(todayMidnight);
+            yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+            queryOptions.period1 = yesterdayMidnight;
+            queryOptions.period2 = todayMidnight; // Show yesterday's full day
             chartData = await yf.chart(ticker, queryOptions);
         }
 
