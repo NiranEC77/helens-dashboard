@@ -10,6 +10,7 @@ import {
     ResponsiveContainer,
     CartesianGrid,
     ReferenceLine,
+    ReferenceArea,
     Brush,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
@@ -30,10 +31,15 @@ interface EnrichedPoint {
     high: number | null;
     low: number | null;
     volume: number | null;
+    session?: "pre" | "regular" | "post";
     newsTitle?: string;
     newsPublisher?: string;
     newsLink?: string;
     hasNews?: boolean;
+    // Separate series for session-based coloring
+    closePre: number | null;
+    closeRegular: number | null;
+    closePost: number | null;
 }
 
 export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
@@ -54,32 +60,104 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
     });
 
     const rawPoints = chartData?.points ?? [];
+    const tradingPeriods = chartData?.tradingPeriods ?? null;
     const newsItems = newsData?.news ?? [];
 
-    // Merge news into chart points by matching time strings
-    const { enrichedPoints, newsOnChart } = useMemo(() => {
+    const hasSessions = range === "1d" && rawPoints.some(p => p.session && p.session !== "regular");
+
+    // Merge news into chart points and split into session series
+    const { enrichedPoints, newsOnChart, sessionBoundaries } = useMemo(() => {
         const newsMap = new Map<string, NewsItem>();
         for (const item of newsItems) {
             if (item.time) newsMap.set(item.time, item);
         }
 
         const matched: { time: string; newsItem: NewsItem; price: number }[] = [];
-        const pts: EnrichedPoint[] = rawPoints.map((p) => {
+
+        // Find session boundary indices for ReferenceArea zones
+        const boundaries: { session: string; startTime: string; endTime: string }[] = [];
+        let currentSession: string | null = null;
+        let sessionStart: string | null = null;
+
+        const pts: EnrichedPoint[] = rawPoints.map((p, idx) => {
             const news = newsMap.get(p.time);
+            const session = p.session || "regular";
+
+            // Track session boundaries
+            if (session !== currentSession) {
+                if (currentSession && sessionStart) {
+                    boundaries.push({
+                        session: currentSession,
+                        startTime: sessionStart,
+                        endTime: rawPoints[idx - 1]?.time || sessionStart,
+                    });
+                }
+                currentSession = session;
+                sessionStart = p.time;
+            }
+
+            const base: EnrichedPoint = {
+                ...p,
+                hasNews: !!news,
+                newsTitle: news?.title,
+                newsPublisher: news?.publisher,
+                newsLink: news?.link,
+                // Split close into per-session series for colored line rendering
+                closePre: null,
+                closeRegular: null,
+                closePost: null,
+            };
+
+            // Assign close to the appropriate session series
+            if (session === "pre") {
+                base.closePre = p.close;
+            } else if (session === "post") {
+                base.closePost = p.close;
+            } else {
+                base.closeRegular = p.close;
+            }
+
             if (news) {
                 matched.push({ time: p.time, newsItem: news, price: p.close ?? 0 });
-                return {
-                    ...p,
-                    newsTitle: news.title,
-                    newsPublisher: news.publisher,
-                    newsLink: news.link,
-                    hasNews: true,
-                };
             }
-            return { ...p, hasNews: false };
+
+            return base;
         });
 
-        return { enrichedPoints: pts, newsOnChart: matched };
+        // Close the last boundary
+        if (currentSession && sessionStart && rawPoints.length > 0) {
+            boundaries.push({
+                session: currentSession,
+                startTime: sessionStart,
+                endTime: rawPoints[rawPoints.length - 1]?.time || sessionStart,
+            });
+        }
+
+        // Bridge gaps: where sessions meet, duplicate the close value so lines connect
+        for (let i = 1; i < pts.length; i++) {
+            const prev = pts[i - 1];
+            const curr = pts[i];
+            const prevSession = rawPoints[i - 1]?.session || "regular";
+            const currSession = rawPoints[i]?.session || "regular";
+
+            if (prevSession !== currSession && prev.close !== null) {
+                // Copy the last value of the previous session into the current session's series
+                // so the line appears connected
+                if (currSession === "regular") {
+                    curr.closeRegular = curr.closeRegular ?? curr.close;
+                    // Also set on previous point to create overlap
+                    prev.closeRegular = prev.close;
+                } else if (currSession === "post") {
+                    curr.closePost = curr.closePost ?? curr.close;
+                    prev.closePost = prev.close;
+                } else if (currSession === "pre") {
+                    curr.closePre = curr.closePre ?? curr.close;
+                    prev.closePre = prev.close;
+                }
+            }
+        }
+
+        return { enrichedPoints: pts, newsOnChart: matched, sessionBoundaries: boundaries };
     }, [rawPoints, newsItems]);
 
     // Determine trend
@@ -91,12 +169,23 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
 
     const accentColor = isPositive ? "var(--neon-teal)" : "var(--electric-orange)";
     const gradientId = `chart-gradient-${ticker}`;
+    const gradientPreId = `chart-gradient-pre-${ticker}`;
+    const gradientPostId = `chart-gradient-post-${ticker}`;
+
+    // Session colors
+    const preColor = "#a78bfa";     // Purple for pre-market
+    const postColor = "#f59e0b";    // Amber for post-market
+    const regularColor = isPositive ? "var(--neon-teal)" : "var(--electric-orange)";
 
     // Custom tooltip that shows news when hovering on a news point
     const CustomTooltip = useCallback(({ active, payload, label }: any) => {
         if (!active || !payload?.length) return null;
         const dataPoint = payload[0]?.payload as EnrichedPoint | undefined;
         const price = dataPoint?.close;
+        const session = dataPoint?.session;
+
+        const sessionLabel = session === "pre" ? "Pre-Market" : session === "post" ? "After-Hours" : "Regular";
+        const sessionColor = session === "pre" ? preColor : session === "post" ? postColor : accentColor;
 
         return (
             <div
@@ -106,8 +195,21 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                     border: "1px solid rgba(255,255,255,0.12)",
                 }}
             >
-                <p className="text-text-muted text-[11px] mb-1">Time: {label}</p>
-                <p className="font-bold text-sm" style={{ color: accentColor }}>
+                <div className="flex items-center gap-2 mb-1">
+                    <p className="text-text-muted text-[11px]">{label}</p>
+                    {session && session !== "regular" && (
+                        <span
+                            className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                            style={{
+                                color: sessionColor,
+                                background: session === "pre" ? "rgba(167,139,250,0.15)" : "rgba(245,158,11,0.15)",
+                            }}
+                        >
+                            {sessionLabel}
+                        </span>
+                    )}
+                </div>
+                <p className="font-bold text-sm" style={{ color: sessionColor }}>
                     {price != null ? formatPrice(price) : "—"}
                 </p>
                 {dataPoint?.hasNews && (
@@ -134,6 +236,10 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
             </div>
         );
     }, [accentColor]);
+
+    // Find pre/post market session boundaries for background zones
+    const preBoundary = sessionBoundaries.find(b => b.session === "pre");
+    const postBoundary = sessionBoundaries.find(b => b.session === "post");
 
     return (
         <div
@@ -193,16 +299,39 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                     </button>
                 </div>
 
-                {/* News legend */}
-                {newsOnChart.length > 0 && (
-                    <div className="flex items-center gap-2 mb-4 text-[11px] text-text-muted">
-                        <span className="w-2 h-2 rounded-full bg-electric-purple animate-pulse-glow" />
-                        <span>
-                            <strong className="text-electric-purple">{newsOnChart.length}</strong>{" "}
-                            news events on timeline — hover to read
-                        </span>
-                    </div>
-                )}
+                {/* Session legend + news legend */}
+                <div className="flex items-center gap-4 mb-4 flex-wrap">
+                    {hasSessions && (
+                        <div className="flex items-center gap-3 text-[11px]">
+                            {preBoundary && (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(167,139,250,0.25)", border: "1px solid rgba(167,139,250,0.5)" }} />
+                                    <span style={{ color: preColor }} className="font-semibold">Pre-Market</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                                <span className="text-text-secondary font-semibold">Regular</span>
+                            </div>
+                            {postBoundary && (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-2 rounded-sm" style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)" }} />
+                                    <span style={{ color: postColor }} className="font-semibold">After-Hours</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {newsOnChart.length > 0 && (
+                        <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                            <span className="w-2 h-2 rounded-full bg-electric-purple animate-pulse-glow" />
+                            <span>
+                                <strong className="text-electric-purple">{newsOnChart.length}</strong>{" "}
+                                news events on timeline — hover to read
+                            </span>
+                        </div>
+                    )}
+                </div>
 
                 {/* Chart */}
                 <div className="h-[280px] md:h-[360px]">
@@ -219,6 +348,7 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                 margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
                             >
                                 <defs>
+                                    {/* Regular gradient */}
                                     <linearGradient
                                         id={gradientId}
                                         x1="0"
@@ -228,12 +358,50 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     >
                                         <stop
                                             offset="5%"
-                                            stopColor={accentColor}
+                                            stopColor={regularColor}
                                             stopOpacity={0.3}
                                         />
                                         <stop
                                             offset="95%"
-                                            stopColor={accentColor}
+                                            stopColor={regularColor}
+                                            stopOpacity={0}
+                                        />
+                                    </linearGradient>
+                                    {/* Pre-market gradient */}
+                                    <linearGradient
+                                        id={gradientPreId}
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                    >
+                                        <stop
+                                            offset="5%"
+                                            stopColor={preColor}
+                                            stopOpacity={0.25}
+                                        />
+                                        <stop
+                                            offset="95%"
+                                            stopColor={preColor}
+                                            stopOpacity={0}
+                                        />
+                                    </linearGradient>
+                                    {/* Post-market gradient */}
+                                    <linearGradient
+                                        id={gradientPostId}
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                    >
+                                        <stop
+                                            offset="5%"
+                                            stopColor={postColor}
+                                            stopOpacity={0.2}
+                                        />
+                                        <stop
+                                            offset="95%"
+                                            stopColor={postColor}
                                             stopOpacity={0}
                                         />
                                     </linearGradient>
@@ -243,6 +411,29 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     stroke="rgba(255,255,255,0.04)"
                                     vertical={false}
                                 />
+
+                                {/* Session background zones */}
+                                {hasSessions && preBoundary && (
+                                    <ReferenceArea
+                                        x1={preBoundary.startTime}
+                                        x2={preBoundary.endTime}
+                                        fill="rgba(167,139,250,0.06)"
+                                        fillOpacity={1}
+                                        stroke="rgba(167,139,250,0.15)"
+                                        strokeDasharray="4 4"
+                                    />
+                                )}
+                                {hasSessions && postBoundary && (
+                                    <ReferenceArea
+                                        x1={postBoundary.startTime}
+                                        x2={postBoundary.endTime}
+                                        fill="rgba(245,158,11,0.04)"
+                                        fillOpacity={1}
+                                        stroke="rgba(245,158,11,0.12)"
+                                        strokeDasharray="4 4"
+                                    />
+                                )}
+
                                 <XAxis
                                     dataKey="time"
                                     tick={{ fill: "var(--text-secondary)", fontSize: 11 }}
@@ -279,62 +470,163 @@ export default function ChartPanel({ ticker, name, onClose }: ChartPanelProps) {
                                     />
                                 ))}
 
-                                <Area
-                                    type="monotone"
-                                    dataKey="close"
-                                    stroke={accentColor}
-                                    strokeWidth={2.5}
-                                    fill={`url(#${gradientId})`}
-                                    dot={(props: any) => {
-                                        const { cx, cy, payload } = props;
-                                        if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
-                                        return (
-                                            <g
-                                                key={`news-dot-${cx}-${cy}`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (payload.newsLink) window.open(payload.newsLink, "_blank");
-                                                }}
-                                                style={{ cursor: "pointer" }}
-                                            >
-                                                {/* Outer glow ring */}
-                                                <circle
-                                                    cx={cx}
-                                                    cy={cy}
-                                                    r={12}
-                                                    fill="rgba(167,139,250,0.15)"
-                                                    stroke="none"
-                                                />
-                                                {/* Inner dot */}
-                                                <circle
-                                                    cx={cx}
-                                                    cy={cy}
-                                                    r={5}
-                                                    fill="var(--electric-purple)"
-                                                    stroke="var(--bg-primary)"
-                                                    strokeWidth={2}
-                                                />
-                                                {/* News icon (⚡) */}
-                                                <text
-                                                    x={cx}
-                                                    y={cy - 16}
-                                                    textAnchor="middle"
-                                                    fontSize={11}
-                                                    fill="white"
-                                                    fontWeight="bold"
+                                {/* Session-colored area layers */}
+                                {hasSessions ? (
+                                    <>
+                                        {/* Pre-market line (purple) */}
+                                        <Area
+                                            type="monotone"
+                                            dataKey="closePre"
+                                            stroke={preColor}
+                                            strokeWidth={2}
+                                            fill={`url(#${gradientPreId})`}
+                                            dot={false}
+                                            activeDot={{
+                                                r: 5,
+                                                fill: preColor,
+                                                stroke: "var(--bg-primary)",
+                                                strokeWidth: 2,
+                                            }}
+                                            connectNulls={false}
+                                            isAnimationActive={false}
+                                        />
+                                        {/* Regular market line (teal/orange) */}
+                                        <Area
+                                            type="monotone"
+                                            dataKey="closeRegular"
+                                            stroke={regularColor}
+                                            strokeWidth={2.5}
+                                            fill={`url(#${gradientId})`}
+                                            dot={(props: any) => {
+                                                const { cx, cy, payload } = props;
+                                                if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
+                                                return (
+                                                    <g
+                                                        key={`news-dot-${cx}-${cy}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (payload.newsLink) window.open(payload.newsLink, "_blank");
+                                                        }}
+                                                        style={{ cursor: "pointer" }}
+                                                    >
+                                                        {/* Outer glow ring */}
+                                                        <circle
+                                                            cx={cx}
+                                                            cy={cy}
+                                                            r={12}
+                                                            fill="rgba(167,139,250,0.15)"
+                                                            stroke="none"
+                                                        />
+                                                        {/* Inner dot */}
+                                                        <circle
+                                                            cx={cx}
+                                                            cy={cy}
+                                                            r={5}
+                                                            fill="var(--electric-purple)"
+                                                            stroke="var(--bg-primary)"
+                                                            strokeWidth={2}
+                                                        />
+                                                        {/* News icon (⚡) */}
+                                                        <text
+                                                            x={cx}
+                                                            y={cy - 16}
+                                                            textAnchor="middle"
+                                                            fontSize={11}
+                                                            fill="white"
+                                                            fontWeight="bold"
+                                                        >
+                                                            ⚡
+                                                        </text>
+                                                    </g>
+                                                );
+                                            }}
+                                            activeDot={{
+                                                r: 5,
+                                                fill: regularColor,
+                                                stroke: "var(--bg-primary)",
+                                                strokeWidth: 2,
+                                            }}
+                                            connectNulls={false}
+                                            isAnimationActive={false}
+                                        />
+                                        {/* Post-market line (amber) */}
+                                        <Area
+                                            type="monotone"
+                                            dataKey="closePost"
+                                            stroke={postColor}
+                                            strokeWidth={2}
+                                            fill={`url(#${gradientPostId})`}
+                                            dot={false}
+                                            activeDot={{
+                                                r: 5,
+                                                fill: postColor,
+                                                stroke: "var(--bg-primary)",
+                                                strokeWidth: 2,
+                                            }}
+                                            connectNulls={false}
+                                            isAnimationActive={false}
+                                        />
+                                    </>
+                                ) : (
+                                    /* Standard single-color area for multi-day views */
+                                    <Area
+                                        type="monotone"
+                                        dataKey="close"
+                                        stroke={accentColor}
+                                        strokeWidth={2.5}
+                                        fill={`url(#${gradientId})`}
+                                        dot={(props: any) => {
+                                            const { cx, cy, payload } = props;
+                                            if (!payload?.hasNews) return <g key={`dot-${cx}-${cy}`} />;
+                                            return (
+                                                <g
+                                                    key={`news-dot-${cx}-${cy}`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (payload.newsLink) window.open(payload.newsLink, "_blank");
+                                                    }}
+                                                    style={{ cursor: "pointer" }}
                                                 >
-                                                    ⚡
-                                                </text>
-                                            </g>
-                                        );
-                                    }}
-                                    activeDot={{
-                                        r: 5,
-                                        fill: accentColor,
-                                        stroke: "var(--bg-primary)",
-                                        strokeWidth: 2,
-                                    }}
-                                />
+                                                    {/* Outer glow ring */}
+                                                    <circle
+                                                        cx={cx}
+                                                        cy={cy}
+                                                        r={12}
+                                                        fill="rgba(167,139,250,0.15)"
+                                                        stroke="none"
+                                                    />
+                                                    {/* Inner dot */}
+                                                    <circle
+                                                        cx={cx}
+                                                        cy={cy}
+                                                        r={5}
+                                                        fill="var(--electric-purple)"
+                                                        stroke="var(--bg-primary)"
+                                                        strokeWidth={2}
+                                                    />
+                                                    {/* News icon (⚡) */}
+                                                    <text
+                                                        x={cx}
+                                                        y={cy - 16}
+                                                        textAnchor="middle"
+                                                        fontSize={11}
+                                                        fill="white"
+                                                        fontWeight="bold"
+                                                    >
+                                                        ⚡
+                                                    </text>
+                                                </g>
+                                            );
+                                        }}
+                                        activeDot={{
+                                            r: 5,
+                                            fill: accentColor,
+                                            stroke: "var(--bg-primary)",
+                                            strokeWidth: 2,
+                                        }}
+                                    />
+                                )}
+
                                 <Brush
                                     dataKey="time"
                                     height={30}

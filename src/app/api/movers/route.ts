@@ -9,6 +9,11 @@ const WATCHLIST = [
     "ROKU", "SHOP", "CRWD", "SNOW", "DKNG", "ABNB", "BTC-USD",
 ];
 
+interface SparkPoint {
+    v: number;
+    session: "pre" | "regular" | "post";
+}
+
 interface Mover {
     ticker: string;
     name: string;
@@ -20,6 +25,7 @@ interface Mover {
     volumeRatio: number | null;
     marketCap: number | null;
     sparkline: number[];
+    intradaySparkline: SparkPoint[];
 }
 
 function safeNum(val: unknown): number | null {
@@ -34,6 +40,29 @@ function getYF(): any {
     return new (YahooFinance as unknown as new (opts?: Record<string, unknown>) => Record<string, unknown>)({
         suppressNotices: ["yahooSurvey", "ripHistorical"],
     });
+}
+
+/** Determine session type from timestamp and trading period boundaries */
+function getSession(
+    timestampSec: number,
+    pre: { start: number; end: number } | null,
+    regular: { start: number; end: number } | null,
+    post: { start: number; end: number } | null,
+): "pre" | "regular" | "post" {
+    if (pre && timestampSec >= pre.start && timestampSec < pre.end) return "pre";
+    if (post && timestampSec >= post.start && timestampSec <= post.end) return "post";
+    return "regular";
+}
+
+/** Extract unix timestamps from Yahoo Finance trading period objects */
+function extractPeriod(period: any): { start: number; end: number } | null {
+    if (!period) return null;
+    const start = period.start instanceof Date ? Math.floor(period.start.getTime() / 1000)
+        : typeof period.start === "number" ? period.start : null;
+    const end = period.end instanceof Date ? Math.floor(period.end.getTime() / 1000)
+        : typeof period.end === "number" ? period.end : null;
+    if (start === null || end === null) return null;
+    return { start, end };
 }
 
 export async function GET() {
@@ -82,6 +111,38 @@ export async function GET() {
                     // sparkline is optional
                 }
 
+                // Intraday sparkline with session info (today, 15m intervals)
+                let intradaySparkline: SparkPoint[] = [];
+                try {
+                    const now = new Date();
+                    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    const intradayData = await yf.chart(symbol, {
+                        period1: dayAgo,
+                        period2: now,
+                        interval: "15m",
+                        includePrePost: true,
+                    });
+
+                    const meta = intradayData.meta || {};
+                    const ctp = meta.currentTradingPeriod || {};
+                    const prePeriod = extractPeriod(ctp.pre);
+                    const regularPeriod = extractPeriod(ctp.regular);
+                    const postPeriod = extractPeriod(ctp.post);
+
+                    intradaySparkline = (intradayData.quotes || [])
+                        .map((h: Record<string, unknown>) => {
+                            const close = safeNum(h.close);
+                            if (close === null) return null;
+                            const date = h.date instanceof Date ? h.date : new Date(h.date as string);
+                            const ts = Math.floor(date.getTime() / 1000);
+                            const session = getSession(ts, prePeriod, regularPeriod, postPeriod);
+                            return { v: close, session };
+                        })
+                        .filter((v: SparkPoint | null): v is SparkPoint => v !== null);
+                } catch {
+                    // intraday sparkline optional
+                }
+
                 movers.push({
                     ticker: symbol,
                     name: q.shortName || q.longName || symbol,
@@ -93,6 +154,7 @@ export async function GET() {
                     volumeRatio,
                     marketCap,
                     sparkline,
+                    intradaySparkline,
                 });
             } catch {
                 continue;
@@ -142,6 +204,7 @@ export async function GET() {
                     volumeRatio: null,
                     marketCap: null,
                     sparkline: closes,
+                    intradaySparkline: [],
                 });
             } catch {
                 continue;

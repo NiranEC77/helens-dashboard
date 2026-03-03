@@ -14,6 +14,30 @@ function getYF(): any {
     });
 }
 
+/** Determine session type from timestamp and trading period boundaries */
+function getSession(
+    timestampSec: number,
+    pre: { start: number; end: number } | null,
+    regular: { start: number; end: number } | null,
+    post: { start: number; end: number } | null,
+): "pre" | "regular" | "post" {
+    if (pre && timestampSec >= pre.start && timestampSec < pre.end) return "pre";
+    if (post && timestampSec >= post.start && timestampSec <= post.end) return "post";
+    // Default to regular
+    return "regular";
+}
+
+/** Extract unix timestamps from Yahoo Finance trading period objects */
+function extractPeriod(period: any): { start: number; end: number } | null {
+    if (!period) return null;
+    const start = period.start instanceof Date ? Math.floor(period.start.getTime() / 1000)
+        : typeof period.start === "number" ? period.start : null;
+    const end = period.end instanceof Date ? Math.floor(period.end.getTime() / 1000)
+        : typeof period.end === "number" ? period.end : null;
+    if (start === null || end === null) return null;
+    return { start, end };
+}
+
 export async function GET(
     _request: Request,
     { params }: { params: Promise<{ ticker: string }> }
@@ -28,7 +52,7 @@ export async function GET(
         const yf = getYF();
         const now = new Date();
 
-        let queryOptions: any = { period2: now };
+        let queryOptions: any = { period2: now, includePrePost: true };
 
         // Map range to yf params
         switch (range) {
@@ -64,8 +88,16 @@ export async function GET(
             );
         }
 
+        // Extract trading period boundaries from meta
+        const meta = chartData.meta || {};
+        const ctp = meta.currentTradingPeriod || {};
+        const prePeriod = extractPeriod(ctp.pre);
+        const regularPeriod = extractPeriod(ctp.regular);
+        const postPeriod = extractPeriod(ctp.post);
+
         const points = chartData.quotes.map((q: Record<string, unknown>) => {
             const date = q.date instanceof Date ? q.date : new Date(q.date as string);
+            const timestampSec = Math.floor(date.getTime() / 1000);
 
             let timeStr;
             if (range === "1d") {
@@ -85,16 +117,38 @@ export async function GET(
                 });
             }
 
+            // Determine session based on trading period boundaries
+            const session = (range === "1d")
+                ? getSession(timestampSec, prePeriod, regularPeriod, postPeriod)
+                : "regular"; // For multi-day ranges, don't tag sessions
+
             return {
                 time: timeStr,
-                timestamp: Math.floor(date.getTime() / 1000),
+                timestamp: timestampSec,
                 open: safeNum(q.open),
                 high: safeNum(q.high),
                 low: safeNum(q.low),
                 close: safeNum(q.close),
                 volume: safeNum(q.volume),
+                session,
             };
         });
+
+        // Build session boundaries for the frontend to draw zones
+        const tradingPeriods = (range === "1d") ? {
+            pre: prePeriod ? {
+                start: prePeriod.start,
+                end: prePeriod.end,
+            } : null,
+            regular: regularPeriod ? {
+                start: regularPeriod.start,
+                end: regularPeriod.end,
+            } : null,
+            post: postPeriod ? {
+                start: postPeriod.start,
+                end: postPeriod.end,
+            } : null,
+        } : null;
 
         // Get name from quote
         let name = ticker;
@@ -105,7 +159,7 @@ export async function GET(
             // name fallback is fine
         }
 
-        return NextResponse.json({ ticker, name, points });
+        return NextResponse.json({ ticker, name, points, tradingPeriods });
     } catch (err) {
         console.error("Chart error:", err);
         return NextResponse.json(

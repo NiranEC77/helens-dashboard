@@ -6,14 +6,21 @@ import {
     ResponsiveContainer,
     YAxis,
     ReferenceLine,
+    ReferenceArea,
     Tooltip,
 } from "recharts";
 import { type Mover, formatPrice, formatVolume, formatMarketCap } from "@/lib/api";
 
-/* Compact sparkline tooltip */
+/* Compact sparkline tooltip with session badge */
 function SparkTooltip({ active, payload }: any) {
     if (!active || !payload?.length) return null;
-    const val = payload[0].value as number;
+    const dataPoint = payload[0]?.payload;
+    const val = dataPoint?.v as number;
+    const session = dataPoint?.session as string | undefined;
+
+    const sessionLabel = session === "pre" ? "PRE" : session === "post" ? "AH" : null;
+    const sessionColor = session === "pre" ? "#a78bfa" : session === "post" ? "#f59e0b" : null;
+
     return (
         <div
             style={{
@@ -25,9 +32,27 @@ function SparkTooltip({ active, payload }: any) {
                 fontWeight: 700,
                 color: "#f0f0f5",
                 whiteSpace: "nowrap",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
             }}
         >
-            ${val.toFixed(2)}
+            <span>${val.toFixed(2)}</span>
+            {sessionLabel && (
+                <span
+                    style={{
+                        fontSize: 8,
+                        fontWeight: 800,
+                        color: sessionColor!,
+                        background: session === "pre" ? "rgba(167,139,250,0.2)" : "rgba(245,158,11,0.2)",
+                        padding: "1px 4px",
+                        borderRadius: 3,
+                        letterSpacing: "0.05em",
+                    }}
+                >
+                    {sessionLabel}
+                </span>
+            )}
         </div>
     );
 }
@@ -57,15 +82,73 @@ export default function StockListView({ stocks, onSelect }: StockListViewProps) 
                 const refLineColor = isUp ? "rgba(45, 212, 191, 0.5)" : "rgba(251, 146, 60, 0.5)";
                 const changeVal = Math.abs(mover.price - mover.prevClose).toFixed(2);
                 const pctVal = Math.abs(mover.gapPct).toFixed(2);
-                const gradientId = `list-spark-${mover.ticker}`;
 
-                const sparkData = mover.sparkline.map((v, idx) => ({ v, i: idx }));
-                const allValues = [...mover.sparkline, mover.prevClose];
+                const preColor = "#a78bfa";
+                const postColor = "#f59e0b";
+
+                // Use intraday sparkline if available
+                const hasIntraday = mover.intradaySparkline && mover.intradaySparkline.length > 1;
+
+                const intradayData = hasIntraday
+                    ? mover.intradaySparkline!.map((p, idx) => ({
+                        v: p.v,
+                        i: idx,
+                        session: p.session,
+                        vPre: p.session === "pre" ? p.v : null,
+                        vRegular: p.session === "regular" ? p.v : null,
+                        vPost: p.session === "post" ? p.v : null,
+                    }))
+                    : null;
+
+                // Bridge session transitions
+                if (intradayData) {
+                    for (let j = 1; j < intradayData.length; j++) {
+                        const prev = intradayData[j - 1];
+                        const curr = intradayData[j];
+                        if (prev.session !== curr.session) {
+                            if (curr.session === "regular") prev.vRegular = prev.v;
+                            else if (curr.session === "post") prev.vPost = prev.v;
+                            else if (curr.session === "pre") prev.vPre = prev.v;
+                        }
+                    }
+                }
+
+                const dailyData = mover.sparkline.map((v, idx) => ({ v, i: idx }));
+                const sparkData = intradayData || dailyData;
+                const hasSessions = hasIntraday && mover.intradaySparkline!.some(p => p.session !== "regular");
+
+                const gradientId = `list-spark-${mover.ticker}`;
+                const gradientPreId = `list-spark-pre-${mover.ticker}`;
+                const gradientPostId = `list-spark-post-${mover.ticker}`;
+
+                const allValues = [
+                    ...(hasIntraday ? mover.intradaySparkline!.map(p => p.v) : mover.sparkline),
+                    mover.prevClose,
+                ];
                 const minVal = Math.min(...allValues);
                 const maxVal = Math.max(...allValues);
                 const range = maxVal - minVal || 1;
                 const domainMin = minVal - range * 0.08;
                 const domainMax = maxVal + range * 0.08;
+
+                // Session boundaries for reference areas
+                const sessionBoundaries: { session: string; startIdx: number; endIdx: number }[] = [];
+                if (intradayData) {
+                    let currentSession: string | null = null;
+                    let startIdx = 0;
+                    for (let j = 0; j < intradayData.length; j++) {
+                        if (intradayData[j].session !== currentSession) {
+                            if (currentSession) {
+                                sessionBoundaries.push({ session: currentSession, startIdx, endIdx: j - 1 });
+                            }
+                            currentSession = intradayData[j].session;
+                            startIdx = j;
+                        }
+                    }
+                    if (currentSession) {
+                        sessionBoundaries.push({ session: currentSession, startIdx, endIdx: intradayData.length - 1 });
+                    }
+                }
 
                 return (
                     <button
@@ -83,6 +166,25 @@ export default function StockListView({ stocks, onSelect }: StockListViewProps) 
                                 >
                                     {isUp ? "▲" : "▼"}
                                 </span>
+                                {/* Session indicator dots */}
+                                {hasSessions && (
+                                    <div className="flex items-center gap-0.5 ml-0.5">
+                                        {mover.intradaySparkline!.some(p => p.session === "pre") && (
+                                            <span
+                                                className="w-1.5 h-1.5 rounded-full"
+                                                style={{ background: preColor }}
+                                                title="Has pre-market data"
+                                            />
+                                        )}
+                                        {mover.intradaySparkline!.some(p => p.session === "post") && (
+                                            <span
+                                                className="w-1.5 h-1.5 rounded-full"
+                                                style={{ background: postColor }}
+                                                title="Has after-hours data"
+                                            />
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <p className="text-text-secondary text-[11px] truncate">{mover.name}</p>
                         </div>
@@ -113,6 +215,18 @@ export default function StockListView({ stocks, onSelect }: StockListViewProps) 
                                                 <stop offset="5%" stopColor={accentColor} stopOpacity={0.3} />
                                                 <stop offset="95%" stopColor={accentColor} stopOpacity={0} />
                                             </linearGradient>
+                                            {hasSessions && (
+                                                <>
+                                                    <linearGradient id={gradientPreId} x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor={preColor} stopOpacity={0.25} />
+                                                        <stop offset="95%" stopColor={preColor} stopOpacity={0} />
+                                                    </linearGradient>
+                                                    <linearGradient id={gradientPostId} x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor={postColor} stopOpacity={0.2} />
+                                                        <stop offset="95%" stopColor={postColor} stopOpacity={0} />
+                                                    </linearGradient>
+                                                </>
+                                            )}
                                         </defs>
                                         <Tooltip
                                             content={<SparkTooltip />}
@@ -125,21 +239,82 @@ export default function StockListView({ stocks, onSelect }: StockListViewProps) 
                                             strokeDasharray="3 2"
                                             strokeWidth={1}
                                         />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="v"
-                                            stroke={accentColor}
-                                            fill={`url(#${gradientId})`}
-                                            strokeWidth={1.5}
-                                            dot={false}
-                                            isAnimationActive={false}
-                                            activeDot={{
-                                                r: 3,
-                                                fill: accentColor,
-                                                stroke: "var(--bg-primary)",
-                                                strokeWidth: 1.5,
-                                            }}
-                                        />
+
+                                        {/* Session background zones */}
+                                        {hasSessions && sessionBoundaries.filter(b => b.session === "pre").map((b, bi) => (
+                                            <ReferenceArea
+                                                key={`pre-zone-${bi}`}
+                                                x1={b.startIdx}
+                                                x2={b.endIdx}
+                                                fill="rgba(167,139,250,0.08)"
+                                                fillOpacity={1}
+                                                stroke="none"
+                                            />
+                                        ))}
+                                        {hasSessions && sessionBoundaries.filter(b => b.session === "post").map((b, bi) => (
+                                            <ReferenceArea
+                                                key={`post-zone-${bi}`}
+                                                x1={b.startIdx}
+                                                x2={b.endIdx}
+                                                fill="rgba(245,158,11,0.06)"
+                                                fillOpacity={1}
+                                                stroke="none"
+                                            />
+                                        ))}
+
+                                        {hasSessions ? (
+                                            <>
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="vPre"
+                                                    stroke={preColor}
+                                                    fill={`url(#${gradientPreId})`}
+                                                    strokeWidth={1.5}
+                                                    dot={false}
+                                                    isAnimationActive={false}
+                                                    connectNulls={false}
+                                                    activeDot={{ r: 2.5, fill: preColor, stroke: "var(--bg-primary)", strokeWidth: 1 }}
+                                                />
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="vRegular"
+                                                    stroke={accentColor}
+                                                    fill={`url(#${gradientId})`}
+                                                    strokeWidth={1.5}
+                                                    dot={false}
+                                                    isAnimationActive={false}
+                                                    connectNulls={false}
+                                                    activeDot={{ r: 3, fill: accentColor, stroke: "var(--bg-primary)", strokeWidth: 1.5 }}
+                                                />
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="vPost"
+                                                    stroke={postColor}
+                                                    fill={`url(#${gradientPostId})`}
+                                                    strokeWidth={1.5}
+                                                    dot={false}
+                                                    isAnimationActive={false}
+                                                    connectNulls={false}
+                                                    activeDot={{ r: 2.5, fill: postColor, stroke: "var(--bg-primary)", strokeWidth: 1 }}
+                                                />
+                                            </>
+                                        ) : (
+                                            <Area
+                                                type="monotone"
+                                                dataKey="v"
+                                                stroke={accentColor}
+                                                fill={`url(#${gradientId})`}
+                                                strokeWidth={1.5}
+                                                dot={false}
+                                                isAnimationActive={false}
+                                                activeDot={{
+                                                    r: 3,
+                                                    fill: accentColor,
+                                                    stroke: "var(--bg-primary)",
+                                                    strokeWidth: 1.5,
+                                                }}
+                                            />
+                                        )}
                                     </AreaChart>
                                 </ResponsiveContainer>
                             )}

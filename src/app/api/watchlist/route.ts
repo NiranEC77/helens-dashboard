@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 
+interface SparkPoint {
+    v: number;
+    session: "pre" | "regular" | "post";
+}
+
 interface WatchlistItem {
     ticker: string;
     name: string;
@@ -12,6 +17,7 @@ interface WatchlistItem {
     volumeRatio: number | null;
     marketCap: number | null;
     sparkline: number[];
+    intradaySparkline: SparkPoint[];
 }
 
 function safeNum(val: unknown): number | null {
@@ -25,6 +31,29 @@ function getYF(): any {
     return new (YahooFinance as unknown as new (opts?: Record<string, unknown>) => Record<string, unknown>)({
         suppressNotices: ["yahooSurvey", "ripHistorical"],
     });
+}
+
+/** Determine session type from timestamp and trading period boundaries */
+function getSession(
+    timestampSec: number,
+    pre: { start: number; end: number } | null,
+    regular: { start: number; end: number } | null,
+    post: { start: number; end: number } | null,
+): "pre" | "regular" | "post" {
+    if (pre && timestampSec >= pre.start && timestampSec < pre.end) return "pre";
+    if (post && timestampSec >= post.start && timestampSec <= post.end) return "post";
+    return "regular";
+}
+
+/** Extract unix timestamps from Yahoo Finance trading period objects */
+function extractPeriod(period: any): { start: number; end: number } | null {
+    if (!period) return null;
+    const start = period.start instanceof Date ? Math.floor(period.start.getTime() / 1000)
+        : typeof period.start === "number" ? period.start : null;
+    const end = period.end instanceof Date ? Math.floor(period.end.getTime() / 1000)
+        : typeof period.end === "number" ? period.end : null;
+    if (start === null || end === null) return null;
+    return { start, end };
 }
 
 export async function GET(request: Request) {
@@ -75,7 +104,7 @@ export async function GET(request: Request) {
                     volumeRatio = Math.round((dayVolume / avgVolume) * 100) / 100;
                 }
 
-                // Sparkline
+                // Daily sparkline (5-day)
                 let sparkline: number[] = [];
                 try {
                     const now = new Date();
@@ -92,6 +121,39 @@ export async function GET(request: Request) {
                     // sparkline optional
                 }
 
+                // Intraday sparkline with session info (today, 15m intervals for compact view)
+                let intradaySparkline: SparkPoint[] = [];
+                try {
+                    const now = new Date();
+                    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    const intradayData = await yf.chart(symbol, {
+                        period1: dayAgo,
+                        period2: now,
+                        interval: "15m",
+                        includePrePost: true,
+                    });
+
+                    // Extract session boundaries
+                    const meta = intradayData.meta || {};
+                    const ctp = meta.currentTradingPeriod || {};
+                    const prePeriod = extractPeriod(ctp.pre);
+                    const regularPeriod = extractPeriod(ctp.regular);
+                    const postPeriod = extractPeriod(ctp.post);
+
+                    intradaySparkline = (intradayData.quotes || [])
+                        .map((h: Record<string, unknown>) => {
+                            const close = safeNum(h.close);
+                            if (close === null) return null;
+                            const date = h.date instanceof Date ? h.date : new Date(h.date as string);
+                            const ts = Math.floor(date.getTime() / 1000);
+                            const session = getSession(ts, prePeriod, regularPeriod, postPeriod);
+                            return { v: close, session };
+                        })
+                        .filter((v: SparkPoint | null): v is SparkPoint => v !== null);
+                } catch {
+                    // intraday sparkline optional
+                }
+
                 stocks.push({
                     ticker: symbol,
                     name: q.shortName || q.longName || symbol,
@@ -103,6 +165,7 @@ export async function GET(request: Request) {
                     volumeRatio,
                     marketCap,
                     sparkline,
+                    intradaySparkline,
                 });
             } catch {
                 continue;

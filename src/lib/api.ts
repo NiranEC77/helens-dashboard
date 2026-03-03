@@ -11,6 +11,7 @@ export interface Mover {
     volumeRatio: number | null;
     marketCap: number | null;
     sparkline: number[];
+    intradaySparkline?: { v: number; session: "pre" | "regular" | "post" }[];
 }
 
 export interface MoversResponse {
@@ -27,12 +28,25 @@ export interface ChartPoint {
     low: number | null;
     close: number | null;
     volume: number | null;
+    session?: "pre" | "regular" | "post";
+}
+
+export interface TradingPeriod {
+    start: number;
+    end: number;
+}
+
+export interface TradingPeriods {
+    pre: TradingPeriod | null;
+    regular: TradingPeriod | null;
+    post: TradingPeriod | null;
 }
 
 export interface ChartResponse {
     ticker: string;
     name: string;
     points: ChartPoint[];
+    tradingPeriods?: TradingPeriods | null;
 }
 
 export interface NewsItem {
