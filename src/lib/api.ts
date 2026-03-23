@@ -92,6 +92,27 @@ export async function fetchWatchlist(tickers: string[]): Promise<WatchlistRespon
     return res.json();
 }
 
+export interface PortfolioQuote {
+    ticker: string;
+    name: string;
+    price: number;
+    prevClose: number;
+    changePct: number;
+}
+
+export interface PortfolioQuotesResponse {
+    quotes: PortfolioQuote[];
+    timestamp: string;
+}
+
+export async function fetchPortfolioQuotes(tickers: string[]): Promise<PortfolioQuotesResponse> {
+    if (tickers.length === 0) return { quotes: [], timestamp: new Date().toISOString() };
+    const unique = [...new Set(tickers)];
+    const res = await fetch(`${API_BASE}/api/portfolio?tickers=${unique.join(",")}`);
+    if (!res.ok) throw new Error(`Failed to fetch portfolio quotes: ${res.status}`);
+    return res.json();
+}
+
 export function formatPrice(n: number): string {
     return new Intl.NumberFormat("en-US", {
         style: "currency",

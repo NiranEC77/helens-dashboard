@@ -302,3 +302,410 @@ body::before {
   background: rgba(239, 68, 68, 0.2);
   color: var(--danger);
 }
+
+/* ──────────────────────────────────
+   Portfolio Section
+   ────────────────────────────────── */
+.portfolio-section {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border-glass);
+}
+
+.portfolio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.portfolio-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portfolio-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.15), rgba(167, 139, 250, 0.15));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.portfolio-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.portfolio-header-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.portfolio-header-total-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.portfolio-header-change {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.portfolio-header-change--up {
+  color: var(--neon-teal);
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.portfolio-header-change--down {
+  color: var(--electric-orange);
+  background: rgba(251, 146, 60, 0.1);
+}
+
+/* ── Portfolio Grid ── */
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* ── Portfolio Card ── */
+.portfolio-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.portfolio-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.portfolio-card-title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.portfolio-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portfolio-card-ticker {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.portfolio-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.portfolio-card:hover .portfolio-card-actions {
+  opacity: 1;
+}
+
+.portfolio-card-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.portfolio-card-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.portfolio-card-btn--delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--danger);
+}
+
+.portfolio-card-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.portfolio-card-price-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.portfolio-card-price-value {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-card-shares {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.portfolio-card-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.portfolio-card-total-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.portfolio-card-total-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-card-change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-card-change--up {
+  background: rgba(45, 212, 191, 0.1);
+  color: var(--neon-teal);
+  border: 1px solid rgba(45, 212, 191, 0.15);
+}
+
+.portfolio-card-change--down {
+  background: rgba(251, 146, 60, 0.1);
+  color: var(--electric-orange);
+  border: 1px solid rgba(251, 146, 60, 0.15);
+}
+
+.portfolio-card-change-icon {
+  font-size: 10px;
+}
+
+.portfolio-card-change-na {
+  color: var(--text-muted);
+}
+
+/* ── Portfolio Form ── */
+.portfolio-form {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.portfolio-form-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.portfolio-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.portfolio-form-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.portfolio-form-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Quicksand', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.portfolio-form-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.portfolio-form-input:focus {
+  border-color: var(--electric-purple);
+  background: rgba(167, 139, 250, 0.06);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+}
+
+.portfolio-form-input--ticker {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  max-width: 140px;
+}
+
+.portfolio-form-input--shares {
+  max-width: 140px;
+}
+
+/* Hide number input spinners */
+.portfolio-form-input--shares::-webkit-inner-spin-button,
+.portfolio-form-input--shares::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.portfolio-form-input--shares {
+  -moz-appearance: textfield;
+}
+
+.portfolio-form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.portfolio-form-submit {
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--neon-teal), var(--electric-purple));
+  color: white;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.portfolio-form-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 24px rgba(45, 212, 191, 0.35);
+}
+
+.portfolio-form-cancel {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.portfolio-form-cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+/* ── Portfolio Empty ── */
+.portfolio-empty {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.portfolio-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.portfolio-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.portfolio-empty-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .portfolio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-form-fields {
+    flex-direction: column;
+  }
+
+  .portfolio-form-input--ticker,
+  .portfolio-form-input--shares {
+    max-width: 100%;
+  }
+
+  .portfolio-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

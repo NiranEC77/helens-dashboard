@@ -8,6 +8,7 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import StockCard from "@/components/StockCard";
 import StockListView from "@/components/StockListView";
 import ChartPanel from "@/components/ChartPanel";
+import PortfolioSection from "@/components/PortfolioSection";
 
 type ViewMode = "movers" | "watchlist";
 
@@ -395,6 +396,9 @@ export default function Dashboard() {
             </p>
           </div>
         )}
+
+        {/* ── Portfolio holdings tracker ── */}
+        <PortfolioSection />
       </main>
 
       {/* ── Chart panel overlay ── */}
