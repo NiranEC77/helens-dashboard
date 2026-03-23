@@ -88,11 +88,13 @@ function HoldingCard({
     quote,
     onEdit,
     onRemove,
+    onToggleExclude,
 }: {
     item: PortfolioItem;
     quote: PortfolioQuote | undefined;
     onEdit: () => void;
     onRemove: () => void;
+    onToggleExclude: () => void;
 }) {
     const price = quote?.price ?? null;
     const prevClose = quote?.prevClose ?? null;
@@ -103,7 +105,7 @@ function HoldingCard({
     const isUp = changePct !== null ? changePct >= 0 : null;
 
     return (
-        <div className="portfolio-card glass-card group">
+        <div className={`portfolio-card glass-card group ${item.excludeFromTotals ? "portfolio-card--excluded" : ""}`}>
             {/* Top row: name + ticker */}
             <div className="portfolio-card-header">
                 <div className="portfolio-card-title-row">
@@ -157,6 +159,17 @@ function HoldingCard({
                     <span className="portfolio-card-change-na">—</span>
                 )}
             </div>
+
+            {/* Exclude from totals toggle */}
+            <label className="portfolio-card-exclude">
+                <input
+                    type="checkbox"
+                    checked={!!item.excludeFromTotals}
+                    onChange={onToggleExclude}
+                    className="portfolio-card-exclude-checkbox"
+                />
+                <span className="portfolio-card-exclude-label">Exclude from totals</span>
+            </label>
         </div>
     );
 }
@@ -195,6 +208,7 @@ export default function PortfolioSection() {
         let valid = false;
 
         for (const item of items) {
+            if (item.excludeFromTotals) continue;
             const q = quotesMap.get(item.ticker);
             if (q) {
                 totalValue += q.price * item.shares;
@@ -284,6 +298,7 @@ export default function PortfolioSection() {
                             quote={quotesMap.get(item.ticker)}
                             onEdit={() => setEditingId(item.id)}
                             onRemove={() => removeItem(item.id)}
+                            onToggleExclude={() => updateItem(item.id, { excludeFromTotals: !item.excludeFromTotals })}
                         />
                     ))}
                 </div>

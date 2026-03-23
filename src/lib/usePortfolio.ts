@@ -9,6 +9,7 @@ export interface PortfolioItem {
     name: string;
     ticker: string;
     shares: number;
+    excludeFromTotals?: boolean;
 }
 
 function generateId(): string {
@@ -48,6 +49,7 @@ export function usePortfolio() {
             name: name.trim(),
             ticker: ticker.trim().toUpperCase(),
             shares,
+            excludeFromTotals: false,
         };
         setItems((prev) => [...prev, item]);
         return item;
@@ -66,6 +68,7 @@ export function usePortfolio() {
                         ...(updates.name !== undefined ? { name: updates.name.trim() } : {}),
                         ...(updates.ticker !== undefined ? { ticker: updates.ticker.trim().toUpperCase() } : {}),
                         ...(updates.shares !== undefined ? { shares: updates.shares } : {}),
+                        ...(updates.excludeFromTotals !== undefined ? { excludeFromTotals: updates.excludeFromTotals } : {}),
                     }
                     : item
             )
