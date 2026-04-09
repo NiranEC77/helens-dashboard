@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase";
 import { useAuth } from "@/providers/AuthProvider";
 
 const STORAGE_KEY = "ag-watchlist";
@@ -44,7 +44,9 @@ export function useWatchlist() {
     // Load data: Firestore if signed in, otherwise localStorage
     useEffect(() => {
         if (user) {
-            const docRef = doc(db, "users", user.uid, "data", "watchlist");
+            const fireDb = getFirebaseDb();
+            if (!fireDb) { setTickers(loadFromLocalStorage() || DEFAULT_WATCHLIST); setLoaded(true); return; }
+            const docRef = doc(fireDb, "users", user.uid, "data", "watchlist");
             const unsubscribe = onSnapshot(docRef, (snap) => {
                 if (snap.exists()) {
                     const data = snap.data();
@@ -78,7 +80,9 @@ export function useWatchlist() {
         if (user) {
             setSyncing(true);
             try {
-                const docRef = doc(db, "users", user.uid, "data", "watchlist");
+                const fireDb = getFirebaseDb();
+                if (!fireDb) return;
+                const docRef = doc(fireDb, "users", user.uid, "data", "watchlist");
                 skipNextSync.current = true;
                 await setDoc(docRef, {
                     tickers: newTickers,

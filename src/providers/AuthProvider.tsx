@@ -7,13 +7,14 @@ import {
     signOut as firebaseSignOut,
     type User,
 } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { getFirebaseAuth, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
 
 interface AuthContextType {
     user: User | null;
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
+    firebaseReady: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     signInWithGoogle: async () => {},
     signOut: async () => {},
+    firebaseReady: false,
 });
 
 export function useAuth() {
@@ -30,8 +32,22 @@ export function useAuth() {
 export default function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [firebaseReady, setFirebaseReady] = useState(false);
 
     useEffect(() => {
+        if (!isFirebaseConfigured()) {
+            // Firebase not configured — skip auth entirely
+            setLoading(false);
+            return;
+        }
+
+        const auth = getFirebaseAuth();
+        if (!auth) {
+            setLoading(false);
+            return;
+        }
+
+        setFirebaseReady(true);
         const unsubscribe = onAuthStateChanged(auth, (u) => {
             setUser(u);
             setLoading(false);
@@ -40,6 +56,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const signInWithGoogle = async () => {
+        const auth = getFirebaseAuth();
+        if (!auth) return;
         try {
             await signInWithPopup(auth, googleProvider);
         } catch (err) {
@@ -48,6 +66,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const signOutFn = async () => {
+        const auth = getFirebaseAuth();
+        if (!auth) return;
         try {
             await firebaseSignOut(auth);
         } catch (err) {
@@ -57,7 +77,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <AuthContext.Provider
-            value={{ user, loading, signInWithGoogle, signOut: signOutFn }}
+            value={{ user, loading, signInWithGoogle, signOut: signOutFn, firebaseReady }}
         >
             {children}
         </AuthContext.Provider>

@@ -1,8 +1,8 @@
 "use client";
 
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,10 +13,41 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
-const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
+// Lazy singletons — only initialize on the client when actually needed
+let _app: FirebaseApp | null = null;
+let _auth: Auth | null = null;
+let _db: Firestore | null = null;
 
-export { app, auth, db, googleProvider };
+function isConfigured(): boolean {
+    return typeof window !== "undefined" && !!firebaseConfig.apiKey;
+}
+
+function getApp(): FirebaseApp {
+    if (!_app) {
+        _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    }
+    return _app;
+}
+
+export function getFirebaseAuth(): Auth | null {
+    if (!isConfigured()) return null;
+    if (!_auth) {
+        _auth = getAuth(getApp());
+    }
+    return _auth;
+}
+
+export function getFirebaseDb(): Firestore | null {
+    if (!isConfigured()) return null;
+    if (!_db) {
+        _db = getFirestore(getApp());
+    }
+    return _db;
+}
+
+export const googleProvider = new GoogleAuthProvider();
+
+/** Whether Firebase is configured (env vars are present) */
+export function isFirebaseConfigured(): boolean {
+    return isConfigured();
+}

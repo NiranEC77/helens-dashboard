@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase";
 import { useAuth } from "@/providers/AuthProvider";
 
 const STORAGE_KEY = "ag-portfolio";
@@ -64,8 +64,10 @@ export function usePortfolio() {
     // Load data: Firestore if signed in, otherwise localStorage
     useEffect(() => {
         if (user) {
+            const fireDb = getFirebaseDb();
+            if (!fireDb) { setItems(loadFromLocalStorage()); setLoaded(true); return; }
             // Subscribe to real-time Firestore updates
-            const docRef = doc(db, "users", user.uid, "data", "portfolio");
+            const docRef = doc(fireDb, "users", user.uid, "data", "portfolio");
             const unsubscribe = onSnapshot(docRef, (snap) => {
                 if (snap.exists()) {
                     const data = snap.data();
@@ -103,7 +105,9 @@ export function usePortfolio() {
         if (user) {
             setSyncing(true);
             try {
-                const docRef = doc(db, "users", user.uid, "data", "portfolio");
+                const fireDb = getFirebaseDb();
+                if (!fireDb) return;
+                const docRef = doc(fireDb, "users", user.uid, "data", "portfolio");
                 skipNextSync.current = true;
                 await setDoc(docRef, {
                     items: newItems,
