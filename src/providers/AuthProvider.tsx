@@ -56,12 +56,33 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const signInWithGoogle = async () => {
+        if (!isFirebaseConfigured()) {
+            const msg = "Firebase is not configured. Make sure NEXT_PUBLIC_FIREBASE_* environment variables are set.";
+            console.error(msg);
+            alert(msg);
+            return;
+        }
         const auth = getFirebaseAuth();
-        if (!auth) return;
+        if (!auth) {
+            const msg = "Could not initialize Firebase Auth.";
+            console.error(msg);
+            alert(msg);
+            return;
+        }
         try {
             await signInWithPopup(auth, googleProvider);
-        } catch (err) {
-            console.error("Google sign-in failed:", err);
+        } catch (err: unknown) {
+            const firebaseErr = err as { code?: string; message?: string };
+            console.error("Google sign-in failed:", firebaseErr);
+            if (firebaseErr.code === "auth/popup-blocked") {
+                alert("Sign-in popup was blocked by your browser. Please allow popups for this site.");
+            } else if (firebaseErr.code === "auth/popup-closed-by-user") {
+                // User closed the popup — no alert needed
+            } else if (firebaseErr.code === "auth/unauthorized-domain") {
+                alert("This domain is not authorized for Firebase Auth. Add it in Firebase Console → Authentication → Settings → Authorized domains.");
+            } else {
+                alert(`Sign-in failed: ${firebaseErr.message || "Unknown error"}`);
+            }
         }
     };
 
