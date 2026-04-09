@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/providers/AuthProvider";
 
 const STORAGE_KEY = "ag-watchlist";
 
@@ -8,55 +11,112 @@ const DEFAULT_WATCHLIST = [
     "VOO", "QQQ", "SPY", "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA",
 ];
 
+function loadFromLocalStorage(): string[] | null {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
+        }
+    } catch {
+        // noop
+    }
+    return null;
+}
+
+function saveToLocalStorage(tickers: string[]) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+    } catch {
+        // noop
+    }
+}
+
 export function useWatchlist() {
+    const { user } = useAuth();
     const [tickers, setTickers] = useState<string[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    const skipNextSync = useRef(false);
 
-    // Load from localStorage on mount
+    // Load data: Firestore if signed in, otherwise localStorage
     useEffect(() => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setTickers(parsed);
+        if (user) {
+            const docRef = doc(db, "users", user.uid, "data", "watchlist");
+            const unsubscribe = onSnapshot(docRef, (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const firestoreTickers = data.tickers || [];
+                    setTickers(firestoreTickers);
+                    saveToLocalStorage(firestoreTickers);
                 } else {
-                    setTickers(DEFAULT_WATCHLIST);
+                    // First sign-in: seed Firestore with localStorage or default
+                    const localTickers = loadFromLocalStorage() || DEFAULT_WATCHLIST;
+                    setTickers(localTickers);
+                    setDoc(docRef, { tickers: localTickers, updatedAt: new Date().toISOString() });
                 }
-            } else {
-                setTickers(DEFAULT_WATCHLIST);
-            }
-        } catch {
-            setTickers(DEFAULT_WATCHLIST);
+                setLoaded(true);
+            }, (err) => {
+                console.error("Watchlist snapshot error:", err);
+                setTickers(loadFromLocalStorage() || DEFAULT_WATCHLIST);
+                setLoaded(true);
+            });
+            return unsubscribe;
+        } else {
+            const local = loadFromLocalStorage();
+            setTickers(local || DEFAULT_WATCHLIST);
+            setLoaded(true);
         }
-        setLoaded(true);
-    }, []);
+    }, [user]);
 
-    // Persist to localStorage on change (skip initial load)
-    useEffect(() => {
-        if (loaded) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+    // Persist to Firestore + localStorage
+    const persistTickers = useCallback(async (newTickers: string[]) => {
+        saveToLocalStorage(newTickers);
+
+        if (user) {
+            setSyncing(true);
+            try {
+                const docRef = doc(db, "users", user.uid, "data", "watchlist");
+                skipNextSync.current = true;
+                await setDoc(docRef, {
+                    tickers: newTickers,
+                    updatedAt: new Date().toISOString(),
+                });
+            } catch (err) {
+                console.error("Failed to sync watchlist:", err);
+            } finally {
+                setSyncing(false);
+            }
         }
-    }, [tickers, loaded]);
+    }, [user]);
 
     const addTicker = useCallback((ticker: string) => {
         const upper = ticker.trim().toUpperCase();
         if (!upper) return false;
         setTickers((prev) => {
             if (prev.includes(upper)) return prev;
-            return [...prev, upper];
+            const next = [...prev, upper];
+            persistTickers(next);
+            return next;
         });
         return true;
-    }, []);
+    }, [persistTickers]);
 
     const removeTicker = useCallback((ticker: string) => {
         const upper = ticker.trim().toUpperCase();
-        setTickers((prev) => prev.filter((t) => t !== upper));
-    }, []);
+        setTickers((prev) => {
+            const next = prev.filter((t) => t !== upper);
+            persistTickers(next);
+            return next;
+        });
+    }, [persistTickers]);
 
     const reorderTickers = useCallback((newOrder: string[]) => {
         setTickers(newOrder);
-    }, []);
+        persistTickers(newOrder);
+    }, [persistTickers]);
 
     const moveTicker = useCallback((ticker: string, direction: -1 | 1) => {
         setTickers((prev) => {
@@ -67,13 +127,15 @@ export function useWatchlist() {
 
             const newArr = [...prev];
             [newArr[index], newArr[newIndex]] = [newArr[newIndex], newArr[index]];
+            persistTickers(newArr);
             return newArr;
         });
-    }, []);
+    }, [persistTickers]);
 
     return {
         tickers,
         loaded,
+        syncing,
         addTicker,
         removeTicker,
         reorderTickers,

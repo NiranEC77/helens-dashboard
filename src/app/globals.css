@@ -662,6 +662,104 @@ body::before {
   color: var(--text-secondary);
 }
 
+/* ── Holding Type Tabs ── */
+.portfolio-type-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.portfolio-type-tab {
+  flex: 1;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Quicksand', sans-serif;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+.portfolio-type-tab:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.portfolio-type-tab--active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Cash Card Styles ── */
+.portfolio-card--cash {
+  border-color: rgba(45, 212, 191, 0.12);
+}
+
+.portfolio-card--cash:hover {
+  border-color: rgba(45, 212, 191, 0.25);
+}
+
+.portfolio-card-ticker--cash {
+  color: var(--neon-teal);
+  letter-spacing: 0.5px;
+}
+
+.portfolio-card-cash-label {
+  color: var(--neon-teal);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.portfolio-card-total-value--cash {
+  color: var(--neon-teal);
+}
+
+.portfolio-card-change--cash {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Sync Indicator ── */
+.portfolio-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes sync-spin {
+  to { transform: rotate(360deg); }
+}
+
+.portfolio-sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-sync-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(167, 139, 250, 0.2);
+  border-top-color: var(--electric-purple);
+  border-radius: 50%;
+  animation: sync-spin 0.8s linear infinite;
+}
+
+.portfolio-sync-ok {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
 /* ── Portfolio Empty ── */
 .portfolio-empty {
   padding: 48px 24px;
